@@ -64,196 +64,287 @@ async function waitFor(fn, description, timeoutMs = 5000) {
   throw new Error(`Timeout: ${description}`);
 }
 
-let failed = false;
+let anyFailed = false;
+let scenarioFailed = false;
 function assert(cond, message) {
   if (!cond) {
-    failed = true;
+    scenarioFailed = true;
+    anyFailed = true;
     console.error(`❌ ÉCHEC: ${message}`);
   } else {
     console.log(`✅ ${message}`);
   }
 }
 
-async function main() {
-  console.log("\n🧪 Test end-to-end — partie complète à 3 joueurs\n" + "─".repeat(50));
-
-  const alex = makeClient("Alex");
-  const sarah = makeClient("Sarah");
-  const lucas = makeClient("Lucas");
-  const players = [alex, sarah, lucas];
-
-  await wait(500);
-
-  // 1) Création de la salle par Alex
-  alex.socket.emit("room:create", { nickname: "Alex", settings: { timers: { enabled: false } } });
-  await waitFor(() => alex.roomCode, "Alex a créé la salle");
-  assert(!!alex.roomCode, `Salle créée avec le code ${alex.roomCode}`);
-
-  // 2) Sarah et Lucas rejoignent
-  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
-  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
-  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
-  await waitFor(() => alex.state?.players.length === 3, "Alex voit bien 3 joueurs dans le lobby");
-  assert(alex.state.players.length === 3, "3 joueurs dans le lobby (temps réel synchronisé)");
-
-  // 3) Lancement de la partie
-  alex.socket.emit("host:start_game", {});
-  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
-  assert(true, "Tous les clients sont passés en phase role_reveal");
-
-  await waitFor(() => alex.secret && sarah.secret && lucas.secret, "Chaque joueur a reçu son secret privé");
-
-  // --- Vérification : personne ne connaît son propre rôle (Mr White retiré,
-  // la règle "personne ne sait" s'applique maintenant à tout le monde) ---
-  assert(
-    players.every((p) => typeof p.secret.theme === "string" && p.secret.theme.length > 0),
-    "Tous les joueurs reçoivent un thème (civil ET infiltré, structure identique)"
-  );
-  assert(
-    players.every((p) => !("role" in p.secret) && !("kind" in p.secret) && !("isUndercover" in p.secret)),
-    "Le payload réseau du secret ne contient AUCUN champ permettant de déduire le rôle civil/infiltré"
-  );
-
-  // On identifie qui est qui SANS jamais lire un champ "rôle" — uniquement en
-  // comparant les thèmes reçus : 2 joueurs partagent un thème (les civils),
-  // 1 joueur a un thème différent (l'infiltré, un seul par partie).
-  const themeGroups = new Map();
+/** Identifie qui a quel thème SANS jamais lire un champ "rôle" — uniquement en comparant les thèmes reçus. */
+function groupByTheme(players) {
+  const groups = new Map();
   for (const p of players) {
-    const list = themeGroups.get(p.secret.theme) ?? [];
+    const key = p.secret.theme; // null pour Mr White
+    const list = groups.get(key) ?? [];
     list.push(p);
-    themeGroups.set(p.secret.theme, list);
+    groups.set(key, list);
   }
-  const groups = [...themeGroups.values()];
-  assert(groups.length === 2, "Deux thèmes distincts circulent parmi les 3 joueurs");
-  const civilPlayers = groups.find((g) => g.length === 2);
-  const undercoverPlayer = groups.find((g) => g.length === 1)?.[0];
-  assert(!!civilPlayers && !!undercoverPlayer, "Répartition 2 joueurs / 1 joueur entre les deux thèmes (un seul infiltré)");
+  return groups;
+}
 
-  // 4) Acquittement du rôle par tout le monde -> ROUND_START -> WAITING_FOR_MUSIC
-  players.forEach((p) => p.socket.emit("role:ack", {}));
-  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
-  assert(true, "La partie démarre, en attente du premier joueur");
-
-  // 5) Chaque joueur envoie un lien mock à son tour — ENVOI AUTOMATIQUE :
-  // plus d'étape de confirmation séparée, "analyser" envoie directement.
-  for (let i = 0; i < 3; i++) {
-    const currentId = alex.state.currentTurnPlayerId;
+async function playOneRound(players, host) {
+  const aliveCount = host.state.turnOrder.length;
+  for (let i = 0; i < aliveCount; i++) {
+    const currentId = host.state.currentTurnPlayerId;
     const current = players.find((p) => p.playerId === currentId);
-    assert(!!current, `Tour ${i + 1}: joueur courant identifié (${current?.nickname})`);
-
-    current.socket.emit("music:submit_url", { url: "mock://demo-0" + (i + 1) });
+    current.socket.emit("music:submit_url", { url: "mock://demo-0" + ((i % 8) + 1) });
     await Promise.all(players.map((p) => waitForPhase(p, "clue_playback", 5000)));
-
-    // Titre/artiste doivent être visibles par TOUS immédiatement, sans
-    // étape de confirmation intermédiaire (envoi automatique).
-    const publicClue = alex.state.clues[alex.state.clues.length - 1];
-    assert(publicClue.playerId === current.playerId, "L'indice diffusé correspond bien au joueur qui vient d'envoyer un lien");
-    assert(
-      typeof publicClue.title === "string" && publicClue.title.length > 0,
-      "Le titre du morceau est visible par tous immédiatement (envoi automatique, sans confirmation manuelle)"
-    );
-    assert(typeof publicClue.artist === "string" && publicClue.artist.length > 0, "L'artiste est visible par tous immédiatement");
-    assert(publicClue.provider === "mock" && publicClue.audioUrl?.startsWith("/mock-audio/"), "Le clue mode démo pointe vers le fichier audio local");
-    assert(typeof publicClue.clipSeconds === "number" && publicClue.clipSeconds > 0, "L'extrait a une durée plafonnée définie");
-
-    if (i < 2) {
+    if (i < aliveCount - 1) {
       await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 10_000)));
     } else {
       await Promise.all(players.map((p) => waitForPhase(p, "discussion", 10_000)));
     }
   }
+}
 
-  assert(true, "Les 3 joueurs ont envoyé leur musique automatiquement, la partie passe en discussion");
-
-  // 6) Vote — on vérifie EN DIRECT que le compteur de votes progresse
-  // (c'était le bug signalé : le compteur restait bloqué à 0 pendant tout
-  // le vote alors que les votes étaient bien pris en compte côté serveur).
-  alex.socket.emit("host:advance_discussion", {});
-  await Promise.all(players.map((p) => waitForPhase(p, "voting", 5000)));
-  assert(alex.state.votesSubmittedCount === 0, "Le compteur de votes démarre à 0");
-
-  const targetId = undercoverPlayer.playerId;
-  const [firstVoter, secondVoter] = players.filter((p) => p.playerId !== targetId);
-
-  firstVoter.socket.emit("vote:submit", { targetId });
-  await waitFor(() => alex.state.votesSubmittedCount === 1, "Le compteur de votes passe bien à 1 après le premier vote (correction du bug)");
-  assert(alex.state.votesSubmittedCount === 1, "votesSubmittedCount reflète le vote en temps réel, sans attendre la fin du vote");
-
-  secondVoter.socket.emit("vote:submit", { targetId });
-  await waitFor(() => alex.state.votesSubmittedCount === 2, "Le compteur de votes passe à 2 après le second vote");
-
-  // L'infiltré vote pour un civil au hasard (ne doit pas pouvoir changer l'issue à 2 contre 1).
-  const aCivil = civilPlayers[0].playerId;
-  undercoverPlayer.socket.emit("vote:submit", { targetId: aCivil });
-
-  await Promise.all(players.map((p) => waitForPhase(p, "elimination", 6000)));
-  assert(alex.state.lastEliminatedPlayerId === targetId, "Le joueur infiltré est bien celui éliminé par le vote majoritaire");
-  assert(alex.state.lastEliminatedRole === "undercover", "Le rôle révélé à l'élimination (à tout le monde) est bien 'undercover'");
-
-  // 7) Fin de partie immédiate : une seule manche de vote suffit, pas de
-  // "manche suivante" sur le même thème.
-  await waitForPhase(alex, "game_over", 6000);
-  assert(alex.state.winner === "civil", `Les civils gagnent bien la partie en une seule manche (winner=${alex.state.winner})`);
-  assert(!!alex.state.reveal, "La révélation complète (rôles + musiques) est fournie en fin de partie");
-  assert(
-    Object.keys(alex.state.reveal.roles).length === 3 && Object.values(alex.state.reveal.roles).every((r) => typeof r.theme === "string"),
-    "Le récapitulatif final donne le rôle et le thème de chaque joueur"
-  );
-  assert(alex.state.reveal.clues.length === 3, "Le récapitulatif final liste bien les 3 musiques jouées (liste à plat, plus de regroupement par manche)");
-  assert(
-    alex.state.reveal.clues.every((c) => players.some((p) => p.playerId === c.playerId)),
-    "Chaque musique du récapitulatif est bien associée à un joueur identifiable par son nom"
-  );
-
-  console.log("─".repeat(50));
-  if (failed) {
-    console.error("\n❌ Au moins un test a échoué. Voir ci-dessus.\n");
-    process.exitCode = 1;
-  } else {
-    console.log("\n✅ Tous les tests end-to-end sont passés — le moteur de jeu fonctionne réellement de bout en bout.\n");
+/** Isole chaque scénario : un blocage ou une erreur dans l'un n'empêche pas de voir les autres. */
+async function runScenario(name, fn, timeoutMs = 20_000) {
+  console.log(`\n🧪 ${name}\n` + "─".repeat(50));
+  scenarioFailed = false;
+  let timer;
+  try {
+    await Promise.race([
+      fn(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timeout du scénario (${timeoutMs}ms)`)), timeoutMs);
+      })
+    ]);
+    console.log(scenarioFailed ? `\n❌ ${name} : au moins un échec.\n` : `\n✅ ${name} : tout est passé.\n`);
+  } catch (err) {
+    anyFailed = true;
+    console.error(`\n❌ ${name} a levé une erreur : ${err.message}\n`);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function scenarioMainMatch() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
+  await wait(400);
+
+  // Score cible à 1 : dès qu'une manche est remportée par un camp, le match
+  // se termine immédiatement — pratique pour un test rapide et déterministe.
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: false, targetScore: 1 }
+  });
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  assert(alex.state.settings.maxPlayers === 16, "Le nombre de joueurs max par défaut est bien passé à 16");
+
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
+  await waitFor(() => alex.state?.players.length === 3, "3 joueurs dans le lobby");
+
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => alex.secret && sarah.secret && lucas.secret, "Chaque joueur a reçu son secret privé");
+  assert(alex.state.roundNumber === 1, "La manche 1 commence bien");
+
+  const groups = groupByTheme(players);
+  assert(groups.size === 2, "Deux thèmes distincts circulent (1 infiltré configuré, pas de Mr White)");
+  const civilGroup = [...groups.values()].find((g) => g.length === 2);
+  const undercoverGroup = [...groups.values()].find((g) => g.length === 1);
+  assert(!!civilGroup && !!undercoverGroup, "Répartition 2 civils / 1 infiltré, comme configuré dans le lobby");
+
+  // --- La manche n'avance QUE quand tout le monde a cliqué "J'ai compris" ---
+  sarah.socket.emit("role:ack", {});
+  lucas.socket.emit("role:ack", {});
+  await wait(300);
+  assert(alex.state.phase === "role_reveal", "La manche ne démarre pas tant qu'il manque un joueur non prêt (Alex n'a pas encore acquitté)");
+  alex.socket.emit("role:ack", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+  assert(true, "La manche démarre dès que tout le monde a acquitté son thème");
+
+  await playOneRound(players, alex);
+  assert(true, "Les 3 joueurs ont envoyé leur musique, la manche passe en discussion");
+
+  // --- La discussion n'avance QUE quand tout le monde a cliqué "Passer au vote" ---
+  const undercoverPlayer = undercoverGroup[0];
+  const [civilA, civilB] = civilGroup;
+  civilA.socket.emit("discussion:ready", {});
+  await wait(300);
+  assert(alex.state.phase === "discussion", "Le vote ne démarre pas tant que tout le monde n'a pas cliqué 'Passer au vote'");
+  assert(alex.state.discussionReadyCount === 1, "Le compteur de joueurs prêts progresse en direct (1/3)");
+  civilB.socket.emit("discussion:ready", {});
+  undercoverPlayer.socket.emit("discussion:ready", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "voting", 5000)));
+  assert(true, "Le vote démarre dès que tout le monde est prêt");
+
+  // --- Vote multiple : chaque joueur peut cocher plusieurs suspects ---
+  civilA.socket.emit("vote:submit", { targetIds: [undercoverPlayer.playerId, civilB.playerId] });
+  await waitFor(() => alex.state.votesSubmittedCount === 1, "Un vote à plusieurs cibles est bien pris en compte");
+  civilB.socket.emit("vote:submit", { targetIds: [undercoverPlayer.playerId] });
+  undercoverPlayer.socket.emit("vote:submit", { targetIds: [civilA.playerId] });
+
+  await Promise.all(players.map((p) => waitForPhase(p, "elimination", 8000)));
+  assert(
+    alex.state.lastEliminatedPlayerIds.includes(undercoverPlayer.playerId),
+    "L'infiltré (2 votes sur 3, majorité absolue) est bien éliminé"
+  );
+  assert(
+    !alex.state.lastEliminatedPlayerIds.includes(civilA.playerId) && !alex.state.lastEliminatedPlayerIds.includes(civilB.playerId),
+    "Les civils, qui n'ont reçu qu'un seul vote chacun, ne sont PAS éliminés (majorité absolue non atteinte)"
+  );
+  assert(alex.state.lastEliminatedRoles[undercoverPlayer.playerId] === "undercover", "Le rôle révélé à l'élimination est bien 'undercover'");
+
+  await waitForPhase(alex, "round_result", 6000);
+  assert(
+    alex.state.lastRoundRoles[undercoverPlayer.playerId] === "undercover" && alex.state.lastRoundRoles[civilA.playerId] === "civil",
+    "Tous les rôles de la manche sont révélés au moment du résultat (plus personne n'a besoin de les cacher)"
+  );
+  const civilScore = alex.state.players.find((p) => p.id === civilA.playerId).score;
+  const undercoverScore = alex.state.players.find((p) => p.id === undercoverPlayer.playerId).score;
+  assert(civilScore === 1, `Le civil survivant gagne +1 point individuellement (score=${civilScore})`);
+  assert(undercoverScore === 0, `L'infiltré éliminé gagne 0 point, peu importe le sort des autres (score=${undercoverScore})`);
+
+  // --- Score cible = 1 : le match doit se terminer immédiatement ---
+  await waitForPhase(alex, "game_over", 8000);
+  assert(alex.state.status === "finished", "Le match se termine dès qu'un score cible est atteint");
+  assert(
+    alex.state.matchWinnerIds.includes(civilA.playerId) && alex.state.matchWinnerIds.includes(civilB.playerId),
+    "Les deux civils (ceux qui ont atteint le score cible) sont déclarés champions du match"
+  );
 
   players.forEach((p) => p.socket.disconnect());
+}
 
-  // --- Scénario additionnel : bouton "Quitter" en lobby ---------------------
-  console.log("\n🧪 Scénario additionnel — quitter la salle en lobby\n" + "─".repeat(50));
+async function scenarioRoundContinuation() {
+  const a2 = makeClient("Nora");
+  const b2 = makeClient("Yanis");
+  const c2 = makeClient("Ines");
+  const trio2 = [a2, b2, c2];
+  await wait(400);
 
-  const host2 = makeClient("Nora");
-  const guest2a = makeClient("Yanis");
-  const guest2b = makeClient("Ines");
-  const trio = [host2, guest2a, guest2b];
+  a2.socket.emit("room:create", {
+    nickname: "Nora",
+    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: false, targetScore: 100 }
+  });
+  await waitFor(() => a2.roomCode, "Nora a créé une salle avec un score cible élevé (100)");
+  b2.socket.emit("room:join", { code: a2.roomCode, nickname: "Yanis" });
+  c2.socket.emit("room:join", { code: a2.roomCode, nickname: "Ines" });
+  await waitFor(() => b2.playerId && c2.playerId, "Yanis et Ines ont rejoint");
 
-  host2.socket.emit("room:create", { nickname: "Nora" });
-  await waitFor(() => host2.roomCode, "Nora a créé une deuxième salle");
-  guest2a.socket.emit("room:join", { code: host2.roomCode, nickname: "Yanis" });
-  guest2b.socket.emit("room:join", { code: host2.roomCode, nickname: "Ines" });
-  await waitFor(() => guest2a.playerId && guest2b.playerId, "Yanis et Ines ont rejoint");
-  await waitFor(() => host2.state?.players.length === 3, "3 joueurs dans le lobby de la deuxième salle");
+  a2.socket.emit("host:start_game", {});
+  await Promise.all(trio2.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => a2.secret && b2.secret && c2.secret, "Secrets reçus pour la manche 1");
+  trio2.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(trio2.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+
+  await playOneRound(trio2, a2);
+  trio2.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(trio2.map((p) => waitForPhase(p, "voting", 5000)));
+  // Personne ne vote pour personne : le camp méchant gagne automatiquement la manche.
+  trio2.forEach((p) => p.socket.emit("vote:submit", { targetIds: [] }));
+
+  await waitForPhase(a2, "round_result", 8000);
+  assert(
+    a2.state.lastEliminatedPlayerIds.length === 0,
+    "Personne n'est éliminé (personne n'a voté pour personne)"
+  );
+  const totalScore = a2.state.players.reduce((sum, p) => sum + p.score, 0);
+  // Score individuel : personne n'étant éliminé, TOUT LE MONDE gagne selon
+  // son propre rôle (2 civils +1 chacun, 1 infiltré +2) = 4, et non pas
+  // seulement l'infiltré comme dans une logique d'équipe (qui aurait donné 2).
+  assert(totalScore === 4, `Chaque joueur gagne ses points individuellement selon son propre rôle, pas en équipe (total=${totalScore}, attendu 4)`);
+  assert(a2.state.status === "in_progress", "Le match continue (score cible à 100, personne ne l'a atteint)");
+
+  await waitForPhase(a2, "role_reveal", 8000);
+  assert(a2.state.roundNumber === 2, "Une nouvelle manche démarre automatiquement (thème et rôles neufs), sans repasser par le lobby");
+  await waitFor(() => a2.secret && b2.secret && c2.secret, "De nouveaux secrets sont bien distribués pour la manche 2");
+
+  trio2.forEach((p) => p.socket.disconnect());
+}
+
+async function scenarioMrWhite() {
+  const p1 = makeClient("Malo");
+  const p2 = makeClient("Chloe");
+  const p3 = makeClient("Adam");
+  const p4 = makeClient("Zoe");
+  const quatuor = [p1, p2, p3, p4];
+  await wait(400);
+
+  p1.socket.emit("room:create", {
+    nickname: "Malo",
+    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: true, targetScore: 1 }
+  });
+  await waitFor(() => p1.roomCode, "Malo a créé une salle avec Mr White activé");
+  p2.socket.emit("room:join", { code: p1.roomCode, nickname: "Chloe" });
+  p3.socket.emit("room:join", { code: p1.roomCode, nickname: "Adam" });
+  p4.socket.emit("room:join", { code: p1.roomCode, nickname: "Zoe" });
+  await waitFor(() => p2.playerId && p3.playerId && p4.playerId, "Les 3 invités ont rejoint");
+
+  p1.socket.emit("host:start_game", {});
+  await Promise.all(quatuor.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => quatuor.every((p) => p.secret), "Les 4 joueurs ont reçu leur secret");
+
+  const withTheme = quatuor.filter((p) => p.secret.theme !== null);
+  const withoutTheme = quatuor.filter((p) => p.secret.theme === null);
+  assert(withoutTheme.length === 1, "Exactement un joueur reçoit 'aucun thème' (Mr White)");
+  assert(withTheme.length === 3, "Les 3 autres joueurs (civils + infiltré) reçoivent bien un thème");
+
+  quatuor.forEach((p) => p.socket.disconnect());
+}
+
+async function scenarioLeaveRoom() {
+  const host2 = makeClient("Yasmine");
+  const guest2a = makeClient("Kevin");
+  const guest2b = makeClient("Lea");
+  const trio3 = [host2, guest2a, guest2b];
+  await wait(400);
+
+  host2.socket.emit("room:create", { nickname: "Yasmine" });
+  await waitFor(() => host2.roomCode, "Yasmine a créé une salle");
+  guest2a.socket.emit("room:join", { code: host2.roomCode, nickname: "Kevin" });
+  guest2b.socket.emit("room:join", { code: host2.roomCode, nickname: "Lea" });
+  await waitFor(() => guest2a.playerId && guest2b.playerId, "Kevin et Lea ont rejoint");
+  await waitFor(() => host2.state?.players.length === 3, "3 joueurs dans le lobby");
 
   const hostIdBefore = host2.state.hostPlayerId;
   host2.socket.emit("player:leave", {});
-  await waitFor(() => guest2a.state?.players.length === 2, "Après le départ de l'hôte, il ne reste plus que 2 joueurs (vu par Yanis)");
-  assert(guest2a.state.players.length === 2, "Le joueur qui quitte est bien retiré de la liste (pas juste marqué déconnecté)");
-  assert(
-    !guest2a.state.players.some((p) => p.id === hostIdBefore),
-    "L'ancien hôte n'apparaît plus du tout dans la liste des joueurs"
-  );
+  await waitFor(() => guest2a.state?.players.length === 2, "Après le départ de l'hôte, il ne reste plus que 2 joueurs");
+  assert(guest2a.state.players.length === 2, "Le joueur qui quitte est bien retiré de la liste");
+  assert(!guest2a.state.players.some((p) => p.id === hostIdBefore), "L'ancien hôte n'apparaît plus dans la liste");
   assert(
     guest2a.state.hostPlayerId !== hostIdBefore && guest2a.state.players.some((p) => p.id === guest2a.state.hostPlayerId),
-    "Le statut d'hôte a été réattribué automatiquement à un joueur restant"
+    "Le statut d'hôte est réattribué automatiquement"
   );
 
-  trio.forEach((p) => p.socket.disconnect());
+  trio3.forEach((p) => p.socket.disconnect());
 }
 
-main()
-  .then(() => process.exit(failed ? 1 : 0))
-  .catch((err) => {
-    console.error("\n❌ Erreur pendant le test:", err.message);
-    process.exit(1);
-  });
+async function main() {
+  console.log("🧪 Test end-to-end — Music Undercover\n" + "═".repeat(50));
+
+  await runScenario("Match principal (rôles configurables, vote multiple, points)", scenarioMainMatch, 45_000);
+  await runScenario("Enchaînement automatique des manches", scenarioRoundContinuation, 55_000);
+  await runScenario("Mr White (aucun thème)", scenarioMrWhite, 15_000);
+  await runScenario("Quitter la salle en lobby", scenarioLeaveRoom, 15_000);
+
+  console.log("\n" + "═".repeat(50));
+  if (anyFailed) {
+    console.error("❌ Au moins un scénario a échoué. Voir le détail ci-dessus.\n");
+  } else {
+    console.log("✅ Tous les scénarios end-to-end sont passés.\n");
+  }
+  process.exit(anyFailed ? 1 : 0);
+}
+
+main().catch((err) => {
+  console.error("\n❌ Erreur fatale pendant le test:", err.message, err.stack);
+  process.exit(1);
+});
 
 setTimeout(() => {
-  console.error("\n❌ Timeout global du test (45s) — le process est forcé de s'arrêter.");
+  console.error("\n❌ Timeout global absolu (180s) — le process est forcé de s'arrêter.");
   process.exit(1);
-}, 45_000);
+}, 180_000);

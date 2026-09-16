@@ -21,18 +21,18 @@ import { RoomStore } from "./RoomStore";
 // ---------------------------------------------------------------------------
 // Toute la logique de règles vit ici. La couche socket (src/lib/socket) ne
 // fait QUE traduire des événements réseau en appels de méthodes ci-dessous,
-// et republier `getPublicState()` / les messages privés retournés. Aucun
-// composant React ne doit jamais recalculer une règle de victoire, un tour,
-// ou une résolution de vote.
+// et republier `getPublicState()` / les messages privés retournés.
 //
-// Format de partie : un thème, un seul infiltré, une seule manche de vote.
-// Dès que le vote tombe (ou qu'une égalité persiste), la partie se termine
-// — on ne recommence pas une manche sur le même thème.
+// Un MATCH enchaîne plusieurs MANCHES (thème + rôles neufs à chaque fois,
+// tout le monde revit) jusqu'à ce qu'un·e joueur·se atteigne le score cible
+// configuré par l'hôte. Rôles configurables (nombre d'infiltrés, Mr White),
+// et le vote de fin de manche peut éliminer plusieurs joueurs à la fois.
 // ---------------------------------------------------------------------------
 
 const MIN_PLAYERS_TO_START = 3;
-const ROLE_REVEAL_SAFETY_MS = 20_000;
 const NEXT_PLAYER_PAUSE_MS = 1_800;
+const ROUND_RESULT_PAUSE_MS = 4_000;
+const NEXT_ROUND_PAUSE_MS = 2_500;
 
 export type EngineResult<T = void> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -49,12 +49,13 @@ function trackKey(track: Pick<ResolvedTrack, "provider" | "providerTrackId">): s
 
 /**
  * Construit le secret envoyé à UN joueur pour son propre rôle : uniquement
- * son thème. Civil et infiltré reçoivent tous les deux exactement la même
- * forme de message, donc rien dans le payload réseau ne permet de deviner
- * lequel des deux on est.
+ * son thème (ou `null` pour Mr White, qui n'en a structurellement aucun).
+ * Civil et infiltré reçoivent tous les deux exactement la même forme de
+ * message, donc rien dans le payload réseau ne permet de deviner lequel des
+ * deux on est.
  */
 function buildPrivateSecret(player: ServerPlayer): PrivatePlayerSecret | null {
-  if (!player.role || !player.theme) return null;
+  if (!player.role) return null;
   return { playerId: player.id, theme: player.theme };
 }
 
@@ -86,7 +87,8 @@ export class GameEngine {
       role: null,
       theme: null,
       usedTrackKeys: new Set(),
-      hasPlayedThisRound: false
+      hasPlayedThisRound: false,
+      score: 0
     };
     room.players.set(hostId, host);
     RoomStore.linkSession(sessionId, code, hostId);
@@ -113,7 +115,8 @@ export class GameEngine {
       role: null,
       theme: null,
       usedTrackKeys: new Set(),
-      hasPlayedThisRound: false
+      hasPlayedThisRound: false,
+      score: 0
     };
     room.players.set(id, player);
     RoomStore.linkSession(sessionId, room.code, id);
@@ -150,6 +153,10 @@ export class GameEngine {
     if (room.hostPlayerId !== hostId) return { ok: false, error: "Seul l'hôte peut modifier les paramètres." };
     if (room.status !== "lobby") return { ok: false, error: "Impossible de modifier les paramètres en cours de partie." };
     room.settings = { ...room.settings, ...patch, timers: { ...room.settings.timers, ...(patch.timers ?? {}) } };
+    // Bornes de sécurité, appliquées immédiatement pour que le lobby affiche des valeurs cohérentes.
+    room.settings.maxPlayers = Math.min(16, Math.max(3, Math.round(room.settings.maxPlayers)));
+    room.settings.undercoverCount = Math.max(1, Math.round(room.settings.undercoverCount));
+    room.settings.targetScore = Math.max(1, Math.round(room.settings.targetScore));
     this.bus.broadcastState(room);
     return { ok: true, value: undefined };
   }
@@ -172,7 +179,7 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
-  // ---- Démarrage de partie -------------------------------------------------
+  // ---- Démarrage du match -------------------------------------------------
 
   startGame(hostId: string): EngineResult {
     const room = this.room;
@@ -184,15 +191,28 @@ export class GameEngine {
     }
 
     room.status = "in_progress";
-    this.assignRolesAndThemes();
-    room.phase = "role_reveal";
-    this.sendAllSecrets();
-    this.bus.broadcastState(room);
-    this.scheduleTimeout(ROLE_REVEAL_SAFETY_MS, () => this.beginRound());
+    for (const player of room.players.values()) player.score = 0;
+    room.roundNumber = 0;
+    this.beginNewRound();
     return { ok: true, value: undefined };
   }
 
-  /** Un seul infiltré, tous les autres civils. Pas de troisième rôle. */
+  /** Démarre une nouvelle manche : thème et rôles neufs, tout le monde revit. */
+  private beginNewRound(): void {
+    const room = this.room;
+    room.roundNumber += 1;
+    this.assignRolesAndThemes();
+    room.phase = "role_reveal";
+    room.lastEliminatedPlayerIds = [];
+    room.lastEliminatedRoles = {};
+    this.sendAllSecrets();
+    this.bus.broadcastState(room);
+    // Pas de délai automatique ici (demande explicite) : la manche n'avance
+    // que lorsque tout le monde a cliqué "J'ai compris", ou si l'hôte force
+    // manuellement la suite (host:force_next_phase) en cas de blocage.
+  }
+
+  /** Un seul infiltré par défaut, configurable ; Mr White optionnel ; le reste civils. */
   private assignRolesAndThemes(): void {
     const room = this.room;
     const pool = room.settings.themeSource === "custom" && room.customThemePairs.length > 0 ? room.customThemePairs : OFFICIAL_THEMES;
@@ -200,13 +220,26 @@ export class GameEngine {
     room.themePair = theme;
 
     const players = shuffle([...room.players.values()]);
-    const roles: Role[] = ["undercover", ...players.slice(1).map(() => "civil" as const)];
+    const mrWhiteCount = room.settings.mrWhiteEnabled ? 1 : 0;
+    const maxBad = Math.max(1, players.length - 1); // laisse au moins 1 civil quand c'est possible
+    let undercoverCount = Math.max(1, room.settings.undercoverCount);
+    if (undercoverCount + mrWhiteCount > maxBad) {
+      undercoverCount = Math.max(1, maxBad - mrWhiteCount);
+    }
+
+    const roles: Role[] = [
+      ...Array(undercoverCount).fill("undercover" as const),
+      ...Array(mrWhiteCount).fill("mrwhite" as const)
+    ];
+    while (roles.length < players.length) roles.push("civil");
+
     const shuffledRoles = shuffle(roles);
     players.forEach((player, index) => {
       const role = shuffledRoles[index]!;
       player.role = role;
-      player.theme = role === "civil" ? theme.civilTheme : theme.undercoverTheme;
+      player.theme = role === "civil" ? theme.civilTheme : role === "undercover" ? theme.undercoverTheme : null;
       player.isAlive = true;
+      player.isReady = false;
       player.usedTrackKeys = new Set();
     });
   }
@@ -220,23 +253,24 @@ export class GameEngine {
   }
 
   ackRoleReveal(playerId: string): void {
-    // Avancer dès que tous les joueurs vivants connectés ont acquitté leur
-    // écran de rôle — avec le garde-fou ROLE_REVEAL_SAFETY_MS en filet de
-    // sécurité si quelqu'un ne répond jamais (déco, distraction...).
+    // La manche n'avance QUE lorsque tout le monde a acquitté son écran de
+    // thème (demande explicite) — le seul déblocage possible en cas de
+    // joueur bloqué/déconnecté est l'intervention manuelle de l'hôte
+    // (host:force_next_phase).
     const room = this.room;
     if (room.phase !== "role_reveal") return;
     const player = room.players.get(playerId);
     if (player) player.isReady = true;
+    this.bus.broadcastState(room);
     const alivePlayers = [...room.players.values()].filter((p) => p.isAlive && p.connected);
     if (alivePlayers.every((p) => p.isReady)) {
-      this.clearTimer();
-      this.beginRound();
+      this.beginTurnOrder();
     }
   }
 
   // ---- Ordre de passage -------------------------------------------
 
-  private beginRound(): void {
+  private beginTurnOrder(): void {
     const room = this.room;
     const alivePlayers = [...room.players.values()].filter((p) => p.isAlive);
     for (const p of alivePlayers) p.hasPlayedThisRound = false;
@@ -269,12 +303,6 @@ export class GameEngine {
 
   // ---- Envoi de musique — automatique dès que l'analyse réussit -------------
 
-  /**
-   * Résout le lien ET envoie l'indice dans la foulée : il n'y a plus d'étape
-   * de confirmation manuelle séparée. Dès que la résolution réussit (lien
-   * reconnu, pas de doublon), le résultat est immédiatement diffusé à toute
-   * la room et la lecture démarre.
-   */
   async submitMusicUrl(playerId: string, url: string): Promise<void> {
     const room = this.room;
     if (room.phase !== "waiting_for_music" || this.currentTurnPlayerId !== playerId) {
@@ -361,14 +389,31 @@ export class GameEngine {
     this.scheduleTimeout(NEXT_PLAYER_PAUSE_MS, () => this.beginTurn());
   }
 
-  // ---- Discussion / vote ----------------------------------------------------
+  // ---- Discussion — tout le monde doit valider pour lancer le vote -----------
 
   private beginDiscussion(): void {
     const room = this.room;
+    for (const p of room.players.values()) p.isReady = false;
     room.phase = "discussion";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.discussionSeconds * 1000 : null;
     this.bus.broadcastState(room);
+    // Plafond dur à 5 minutes (ou la valeur configurée) : filet de sécurité
+    // si tout le monde ne clique pas "Passer au vote".
     this.scheduleDeadline(room.phaseDeadline, () => this.beginVoting());
+  }
+
+  /** Chaque joueur clique "Passer au vote" ; le vote démarre dès que tout le monde vivant l'a fait. */
+  markDiscussionReady(playerId: string): void {
+    const room = this.room;
+    if (room.phase !== "discussion") return;
+    const player = room.players.get(playerId);
+    if (player) player.isReady = true;
+    this.bus.broadcastState(room);
+    const alivePlayers = [...room.players.values()].filter((p) => p.isAlive && p.connected);
+    if (alivePlayers.every((p) => p.isReady)) {
+      this.clearTimer();
+      this.beginVoting();
+    }
   }
 
   hostAdvanceFromDiscussion(hostId: string): EngineResult {
@@ -379,30 +424,33 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
-  private beginVoting(eligibleTargets?: string[]): void {
+  // ---- Vote — plusieurs suspects possibles, plusieurs éliminations possibles --
+
+  private beginVoting(): void {
     const room = this.room;
     room.votes = new Map();
-    room.pendingTieBreak = eligibleTargets ?? null;
     room.phase = "voting";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.voteSeconds * 1000 : null;
     this.bus.broadcastState(room);
     this.scheduleDeadline(room.phaseDeadline, () => this.resolveVotes());
   }
 
-  submitVote(voterId: string, targetId: string): EngineResult {
+  /** @param targetIds Un ou plusieurs suspects cochés ; tableau vide autorisé (abstention). */
+  submitVote(voterId: string, targetIds: string[]): EngineResult {
     const room = this.room;
     if (room.phase !== "voting") return { ok: false, error: "Ce n'est pas le moment de voter." };
     const voter = room.players.get(voterId);
     if (!voter || !voter.isAlive) return { ok: false, error: "Tu ne peux pas voter." };
-    if (voterId === targetId) return { ok: false, error: "Impossible de voter pour toi-même." };
-    const target = room.players.get(targetId);
-    if (!target || !target.isAlive) return { ok: false, error: "Cible invalide." };
-    if (room.pendingTieBreak && !room.pendingTieBreak.includes(targetId)) {
-      return { ok: false, error: "Seuls les joueurs à égalité peuvent être ciblés pour ce second tour." };
+
+    const uniqueTargets = new Set(targetIds);
+    if (uniqueTargets.has(voterId)) return { ok: false, error: "Impossible de voter pour toi-même." };
+    for (const targetId of uniqueTargets) {
+      const target = room.players.get(targetId);
+      if (!target || !target.isAlive) return { ok: false, error: "Cible invalide." };
     }
 
-    room.votes.set(voterId, targetId);
-    // Le NOMBRE de votes reçus est public en direct (votesSubmittedCount),
+    room.votes.set(voterId, uniqueTargets);
+    // Le NOMBRE de bulletins reçus est public en direct (votesSubmittedCount),
     // mais jamais le détail (qui a voté pour qui) avant la résolution.
     this.bus.broadcastState(room);
 
@@ -417,68 +465,71 @@ export class GameEngine {
   private resolveVotes(): void {
     const room = this.room;
     const tally: VoteTally = {};
-    for (const targetId of room.votes.values()) {
-      tally[targetId] = (tally[targetId] ?? 0) + 1;
+    for (const targets of room.votes.values()) {
+      for (const targetId of targets) {
+        tally[targetId] = (tally[targetId] ?? 0) + 1;
+      }
     }
     room.lastVoteTally = tally;
 
-    const topCandidates = GameRules.resolveTie(tally);
+    const aliveCount = [...room.players.values()].filter((p) => p.isAlive).length;
+    const eliminatedIds = GameRules.resolveMajority(tally, aliveCount);
 
-    if (topCandidates.length === 0) {
-      // Personne n'a voté du tout : pas d'élimination, l'infiltré s'en sort.
-      room.phase = "vote_result";
-      room.lastEliminatedPlayerId = null;
-      this.bus.broadcastState(room);
-      this.scheduleTimeout(3_000, () => this.concludeGame(null));
-      return;
-    }
-
-    if (topCandidates.length > 1) {
-      if (room.pendingTieBreak) {
-        // Égalité persistante après le second tour : personne n'est éliminé.
-        room.phase = "vote_result";
-        room.lastEliminatedPlayerId = null;
-        room.pendingTieBreak = null;
-        this.bus.broadcastState(room);
-        this.scheduleTimeout(3_000, () => this.concludeGame(null));
-        return;
+    room.lastEliminatedPlayerIds = eliminatedIds;
+    room.lastEliminatedRoles = {};
+    for (const id of eliminatedIds) {
+      const player = room.players.get(id);
+      if (player) {
+        player.isAlive = false;
+        room.lastEliminatedRoles[id] = player.role!;
       }
-      // Premier tour à égalité : second vote restreint aux candidats à égalité.
-      room.phase = "vote_result";
-      this.bus.broadcastState(room);
-      this.scheduleTimeout(3_000, () => this.beginVoting(topCandidates));
-      return;
     }
 
-    const eliminatedId = topCandidates[0]!;
-    room.lastEliminatedPlayerId = eliminatedId;
-    room.pendingTieBreak = null;
     room.phase = "vote_result";
     this.bus.broadcastState(room);
-    this.scheduleTimeout(3_000, () => this.eliminate(eliminatedId));
+    this.scheduleTimeout(3_000, () => this.showElimination());
   }
 
-  private eliminate(playerId: string): void {
+  private showElimination(): void {
     const room = this.room;
-    const player = room.players.get(playerId);
-    if (!player) return this.concludeGame(null);
-    player.isAlive = false;
-    room.lastEliminatedRole = player.role;
     room.phase = "elimination";
     this.bus.broadcastState(room);
-    this.scheduleTimeout(2_500, () => this.concludeGame(player.role));
+    this.scheduleTimeout(2_500, () => this.concludeRound());
   }
 
-  // ---- Fin de partie — une seule manche de vote suffit -----------------------
+  // ---- Fin de manche — score, puis manche suivante ou fin du match -----------
 
-  /**
-   * @param eliminatedRole Le rôle du joueur éliminé par le vote, ou `null`
-   *   si personne n'a été éliminé. Détermine directement le gagnant : pas de
-   *   "manche suivante" sur le même thème.
-   */
-  private concludeGame(eliminatedRole: Role | null): void {
+  private concludeRound(): void {
     const room = this.room;
-    room.winner = GameRules.resolveOutcome(eliminatedRole);
+
+    // Points strictement individuels : infiltré(s) et Mr White ne forment
+    // pas une équipe. Chaque joueur gagne selon SA PROPRE survie au vote,
+    // pas selon le sort des autres joueurs de son rôle. La manche est
+    // terminée : plus aucune raison stratégique de cacher qui avait quel
+    // rôle — on le révèle à tout le monde en même temps que le résultat,
+    // ce qui permet à chacun de comprendre pourquoi son score vient de
+    // changer (lui-même ne connaissait pas son propre rôle avant cet instant).
+    room.lastRoundRoles = {};
+    for (const player of room.players.values()) {
+      if (!player.role) continue;
+      room.lastRoundRoles[player.id] = player.role;
+      player.score += GameRules.pointsFor(player.role, player.isAlive);
+    }
+
+    room.phase = "round_result";
+    this.bus.broadcastState(room);
+
+    const champions = [...room.players.values()].filter((p) => p.score >= room.settings.targetScore);
+    if (champions.length > 0) {
+      this.scheduleTimeout(ROUND_RESULT_PAUSE_MS, () => this.concludeMatch(champions.map((c) => c.id)));
+    } else {
+      this.scheduleTimeout(ROUND_RESULT_PAUSE_MS + NEXT_ROUND_PAUSE_MS, () => this.beginNewRound());
+    }
+  }
+
+  private concludeMatch(matchWinnerIds: string[]): void {
+    const room = this.room;
+    room.matchWinnerIds = matchWinnerIds;
     room.status = "finished";
     room.phase = "game_over";
     this.bus.broadcastState(room);
@@ -526,7 +577,7 @@ export class GameEngine {
     this.clearTimer();
     switch (room.phase) {
       case "role_reveal":
-        this.beginRound();
+        this.beginTurnOrder();
         break;
       case "waiting_for_music":
         this.forceSkipCurrentTurn();
@@ -566,7 +617,7 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
-  // ---- Revanche — nouvelle partie, thème et rôles neufs ------------------------
+  // ---- Revanche — nouveau match complet, scores remis à zéro ------------------
 
   rematch(hostId: string): EngineResult {
     const room = this.room;
@@ -579,18 +630,19 @@ export class GameEngine {
       player.role = null;
       player.theme = null;
       player.usedTrackKeys = new Set();
+      player.score = 0;
     }
     room.status = "lobby";
     room.phase = "lobby";
+    room.roundNumber = 0;
     room.turnOrder = [];
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
     room.votes = new Map();
     room.lastVoteTally = null;
-    room.lastEliminatedPlayerId = null;
-    room.lastEliminatedRole = null;
-    room.pendingTieBreak = null;
-    room.winner = null;
+    room.lastEliminatedPlayerIds = [];
+    room.lastEliminatedRoles = {};
+    room.matchWinnerIds = null;
     room.phaseDeadline = null;
     room.themePair = null;
     this.bus.broadcastState(room);
@@ -631,17 +683,21 @@ export class GameEngine {
       isAlive: p.isAlive,
       isReady: p.isReady,
       isConnected: p.connected,
-      hasPlayedThisRound: room.turnOrder.slice(0, room.currentTurnIndex).includes(p.id)
+      hasPlayedThisRound: room.turnOrder.slice(0, room.currentTurnIndex).includes(p.id),
+      score: p.score
     }));
 
     let reveal: RoomReveal | null = null;
     if (room.status === "finished") {
       const roles: RoomReveal["roles"] = {};
       for (const p of room.players.values()) {
-        roles[p.id] = { role: p.role ?? "civil", theme: p.theme ?? "" };
+        roles[p.id] = { role: p.role ?? "civil", theme: p.theme };
       }
       reveal = { roles, clues: room.currentRoundClues };
     }
+
+    const alivePlayers = [...room.players.values()].filter((p) => p.isAlive && p.connected);
+    const discussionReadyCount = room.phase === "discussion" ? alivePlayers.filter((p) => p.isReady).length : 0;
 
     return {
       code: room.code,
@@ -650,16 +706,18 @@ export class GameEngine {
       hostPlayerId: room.hostPlayerId,
       settings: room.settings,
       players,
+      roundNumber: room.roundNumber,
       turnOrder: room.turnOrder,
       currentTurnPlayerId: this.currentTurnPlayerId,
       clues: room.currentRoundClues,
       phaseDeadline: room.phaseDeadline,
-      lastEliminatedPlayerId: room.lastEliminatedPlayerId,
-      lastEliminatedRole: room.lastEliminatedRole,
-      lastVoteTally: room.phase === "vote_result" || room.status === "finished" ? room.lastVoteTally : null,
+      lastEliminatedPlayerIds: room.lastEliminatedPlayerIds,
+      lastEliminatedRoles: room.lastEliminatedRoles,
+      lastVoteTally: room.phase === "vote_result" || room.phase === "elimination" || room.phase === "round_result" || room.status === "finished" ? room.lastVoteTally : null,
       votesSubmittedCount: room.votes.size,
-      pendingTieBreak: room.pendingTieBreak,
-      winner: room.winner,
+      discussionReadyCount,
+      lastRoundRoles: room.lastRoundRoles,
+      matchWinnerIds: room.matchWinnerIds,
       reveal
     };
   }

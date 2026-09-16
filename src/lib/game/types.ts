@@ -18,9 +18,11 @@ export interface ServerPlayer {
   socketId: string | null;
   role: Role | null;
   theme: string | null;
-  /** Clés de morceaux déjà utilisées par CE joueur (provider:trackId), pour éviter les doublons. */
+  /** Clés de morceaux déjà utilisées par CE joueur (provider:trackId), pour éviter les doublons — remis à zéro à chaque manche. */
   usedTrackKeys: Set<string>;
   hasPlayedThisRound: boolean;
+  /** Cumulé sur tout le match, remis à zéro uniquement à la revanche depuis le lobby. */
+  score: number;
 }
 
 export interface ServerRoom {
@@ -32,15 +34,17 @@ export interface ServerRoom {
   players: Map<string, ServerPlayer>;
   customThemePairs: ThemePair[];
   themePair: ThemePair | null;
+  roundNumber: number;
   turnOrder: string[];
   currentTurnIndex: number;
   currentRoundClues: MusicClue[];
-  votes: Map<string, string>; // voterId -> targetId
+  /** voterId -> ensemble des cibles cochées (vote multiple). */
+  votes: Map<string, Set<string>>;
   lastVoteTally: VoteTally | null;
-  lastEliminatedPlayerId: string | null;
-  lastEliminatedRole: Role | null;
-  pendingTieBreak: string[] | null;
-  winner: Role | null;
+  lastEliminatedPlayerIds: string[];
+  lastEliminatedRoles: Record<string, Role>;
+  lastRoundRoles: Record<string, Role>;
+  matchWinnerIds: string[] | null;
   phaseDeadline: number | null;
   phaseTimer: NodeJS.Timeout | null;
   createdAt: number;
@@ -57,15 +61,16 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     players: new Map(),
     customThemePairs: [],
     themePair: null,
+    roundNumber: 0,
     turnOrder: [],
     currentTurnIndex: 0,
     currentRoundClues: [],
     votes: new Map(),
     lastVoteTally: null,
-    lastEliminatedPlayerId: null,
-    lastEliminatedRole: null,
-    pendingTieBreak: null,
-    winner: null,
+    lastEliminatedPlayerIds: [],
+    lastEliminatedRoles: {},
+    lastRoundRoles: {},
+    matchWinnerIds: null,
     phaseDeadline: null,
     phaseTimer: null,
     createdAt: Date.now(),

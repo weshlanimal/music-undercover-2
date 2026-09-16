@@ -13,6 +13,7 @@ export const ClientEvents = {
   ACK_ROLE_REVEAL: "role:ack",
   SUBMIT_MUSIC_URL: "music:submit_url",
   SUBMIT_VOTE: "vote:submit",
+  DISCUSSION_READY: "discussion:ready",
   HOST_ADVANCE_DISCUSSION: "host:advance_discussion",
   HOST_FORCE_NEXT_PHASE: "host:force_next_phase",
   HOST_REMOVE_PLAYER: "host:remove_player",

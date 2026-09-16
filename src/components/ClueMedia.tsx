@@ -22,9 +22,14 @@ interface ClueMediaProps {
  * explicitement — la découverte musicale prime sur l'anonymisation).
  * L'extrait YouTube est plafonné via les paramètres d'URL start/end du
  * lecteur officiel embarqué, quelle que soit la durée réelle de la vidéo.
+ *
+ * Quand autoPlay est demandé (l'écran "tout le monde écoute ensemble"), la
+ * vidéo démarre directement sans clic supplémentaire — pas de vignette à
+ * cliquer, pour ne pas perdre de temps d'écoute. Le bouton de lecture reste
+ * utile pour la réécoute à la demande pendant la discussion.
  */
 export function ClueMedia({ provider, videoId, audioUrl, title, artist, thumbnailUrl, clipSeconds, autoPlay }: ClueMediaProps) {
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(!!autoPlay);
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-ink-border bg-ink-elevated">

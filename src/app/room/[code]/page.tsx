@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check } from "lucide-react";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { Avatar } from "@/components/Avatar";
@@ -13,13 +13,16 @@ import { ClueMedia } from "@/components/ClueMedia";
 import { QuitButton } from "@/components/QuitButton";
 import { useGameSocket } from "@/lib/socket/client";
 import { mockDemoLinks } from "@/lib/music/MockMusicProvider";
-import type { MusicClue } from "@/types";
+import type { MusicClue, PrivatePlayerSecret, Role } from "@/types";
+
+const STREAMER_MODE_KEY = "music-undercover:streamerMode";
+const ROLE_LABEL: Record<Role, string> = { civil: "Civil", undercover: "Infiltré", mrwhite: "Mr White" };
 
 export default function RoomPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const socket = useGameSocket();
-  const { state, playerId, connected, errorMessage, leaveRoom } = socket;
+  const { state, playerId, connected, errorMessage, mySecret, leaveRoom } = socket;
 
   function handleQuit() {
     leaveRoom();
@@ -47,9 +50,15 @@ export default function RoomPage() {
     );
   }
 
+  // Le thème reste affiché tout au long de la partie (demande explicite) —
+  // sauf pendant l'écran de révélation lui-même (qui l'affiche déjà en
+  // grand) et hors partie (lobby / fin de match, où le récap prend le relais).
+  const showThemeBadge = state.status === "in_progress" && state.phase !== "role_reveal" && !!mySecret;
+
   return (
     <>
       <QuitButton onQuit={handleQuit} />
+      {showThemeBadge && <MyThemeBadge secret={mySecret!} />}
       <RoomByPhase key={state.phase} {...socket} state={state} playerId={playerId} />
     </>
   );
@@ -80,6 +89,8 @@ function RoomByPhase(props: Props) {
       return <PhaseVoteResult {...props} />;
     case "elimination":
       return <PhaseElimination {...props} />;
+    case "round_result":
+      return <PhaseRoundResult {...props} />;
     case "game_over":
       return <PhaseGameOver {...props} />;
     default:
@@ -88,12 +99,60 @@ function RoomByPhase(props: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// LOBBY (sections 4/5)
+// Badge persistant "mon thème" — visible tout au long de la partie (demande
+// explicite), avec un mode streamer pour le flouter à la demande.
+// ---------------------------------------------------------------------------
+function MyThemeBadge({ secret }: { secret: PrivatePlayerSecret }) {
+  const [open, setOpen] = useState(false);
+  const [streamerMode, setStreamerMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(STREAMER_MODE_KEY) === "1";
+  });
+
+  function toggleStreamerMode(e: MouseEvent) {
+    e.stopPropagation();
+    setStreamerMode((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(STREAMER_MODE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
+
+  const label = secret.theme ?? "Mr White — aucun thème";
+
+  return (
+    <div className="fixed right-4 top-4 z-50">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-full border border-ink-border bg-ink-elevated/90 px-3 py-2 text-xs text-paper-muted shadow-lg backdrop-blur-md hover:text-paper"
+      >
+        🎧 Mon thème
+      </button>
+      {open && (
+        <div className="mt-2 w-56 rounded-2xl border border-ink-border bg-ink-elevated/95 p-3 text-right shadow-lg backdrop-blur-md">
+          <button
+            onClick={toggleStreamerMode}
+            className="mb-2 inline-flex items-center gap-1 text-[11px] text-paper-faint hover:text-paper"
+          >
+            {streamerMode ? <EyeOff size={11} /> : <Eye size={11} />}
+            Mode streamer
+          </button>
+          <p className={streamerMode ? "select-none text-sm text-paper blur-sm" : "text-sm text-paper"}>{label}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LOBBY — rôles configurables (nombre d'infiltrés, Mr White), score cible,
+// nombre de joueurs (jusqu'à 16).
 // ---------------------------------------------------------------------------
 function PhaseLobby({ state, playerId, setReady, updateSettings, startGame, hostRemovePlayer }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = state.hostPlayerId === playerId;
   const [copied, setCopied] = useState(false);
+  const maxBadRoles = Math.max(1, state.players.length - 1);
 
   return (
     <PhaseShell
@@ -132,6 +191,61 @@ function PhaseLobby({ state, playerId, setReady, updateSettings, startGame, host
       {isHost && (
         <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-ink-border bg-ink-elevated p-4">
           <p className="text-sm font-medium text-paper">Paramètres de l&apos;hôte</p>
+
+          <label className="flex items-center justify-between text-sm">
+            <span>Nombre d&apos;infiltrés</span>
+            <select
+              value={Math.min(state.settings.undercoverCount, maxBadRoles)}
+              onChange={(e) => updateSettings({ undercoverCount: Number(e.target.value) })}
+              className="rounded-lg border border-ink-border bg-ink-raised px-2 py-1 text-sm text-paper"
+            >
+              {Array.from({ length: maxBadRoles }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex items-center justify-between text-sm">
+            <span>Mr White</span>
+            <input
+              type="checkbox"
+              checked={state.settings.mrWhiteEnabled}
+              onChange={(e) => updateSettings({ mrWhiteEnabled: e.target.checked })}
+              className="h-5 w-5 accent-signal"
+            />
+          </label>
+
+          <label className="flex items-center justify-between text-sm">
+            <span>Score pour gagner le match</span>
+            <select
+              value={state.settings.targetScore}
+              onChange={(e) => updateSettings({ targetScore: Number(e.target.value) })}
+              className="rounded-lg border border-ink-border bg-ink-raised px-2 py-1 text-sm text-paper"
+            >
+              {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n} pt{n > 1 ? "s" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex items-center justify-between text-sm">
+            <span>Joueurs max</span>
+            <select
+              value={state.settings.maxPlayers}
+              onChange={(e) => updateSettings({ maxPlayers: Number(e.target.value) })}
+              className="rounded-lg border border-ink-border bg-ink-raised px-2 py-1 text-sm text-paper"
+            >
+              {[6, 8, 10, 12, 14, 16].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="flex items-center justify-between text-sm">
             <span>Timers activés</span>
@@ -188,24 +302,21 @@ function PhaseLobby({ state, playerId, setReady, updateSettings, startGame, host
 // ---------------------------------------------------------------------------
 // RÉVÉLATION DE RÔLE
 //
-// Règle : seul Mr White connaît son propre rôle. Un civil et un infiltré
-// voient tous les deux uniquement leur thème, sans jamais savoir s'ils ont
-// le thème majoritaire ou minoritaire.
-//
 // Affiché en clair en permanence (pas de "maintenir appuyé") : personne
-// d'autre ne regarde ton écran. Le "mode streamer" reste disponible pour
-// celles et ceux qui diffusent leur écran en direct — il floute le contenu
-// jusqu'à ce qu'il soit désactivé, et la préférence est mémorisée pour les
-// prochaines parties.
+// d'autre ne regarde ton écran. Un civil et un infiltré voient tous les
+// deux uniquement leur thème, sans jamais savoir lequel des deux ils sont.
+// Mr White (si activé) n'a structurellement aucun thème — c'est en soi son
+// information. La manche n'avance que lorsque tout le monde a cliqué
+// "J'ai compris" (demande explicite) ; seul l'hôte peut forcer la suite en
+// cas de blocage.
 // ---------------------------------------------------------------------------
-const STREAMER_MODE_KEY = "music-undercover:streamerMode";
-
 function PhaseRoleReveal({ mySecret, ackRoleReveal }: Props) {
   const [acked, setAcked] = useState(false);
   const [streamerMode, setStreamerMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(STREAMER_MODE_KEY) === "1";
   });
+  const isMrWhite = mySecret?.theme === null;
 
   function toggleStreamerMode() {
     setStreamerMode((prev) => {
@@ -217,7 +328,7 @@ function PhaseRoleReveal({ mySecret, ackRoleReveal }: Props) {
 
   return (
     <PhaseShell
-      eyebrow="Ton thème secret"
+      eyebrow={isMrWhite ? "Tu es Mr White" : "Ton thème secret"}
       title="Personne d'autre ne voit cet écran"
       footer={
         <Button
@@ -242,10 +353,21 @@ function PhaseRoleReveal({ mySecret, ackRoleReveal }: Props) {
         </button>
 
         <div className={streamerMode ? "select-none blur-md" : undefined}>
-          <p className="text-xl text-paper">{mySecret?.theme ?? ""}</p>
-          <p className="mt-4 max-w-xs text-sm text-paper-faint">
-            Tu ne sais pas si c&apos;est le thème majoritaire ou minoritaire — personne ne te le dira.
-          </p>
+          {isMrWhite ? (
+            <>
+              <p className="font-display text-2xl font-medium text-alert">MR WHITE</p>
+              <p className="mt-4 max-w-xs text-paper-muted">
+                Tu n&apos;as aucun thème. Observe les musiques des autres pour deviner le leur, et bluffe.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xl text-paper">{mySecret?.theme ?? ""}</p>
+              <p className="mt-4 max-w-xs text-sm text-paper-faint">
+                Tu ne sais pas si c&apos;est le thème majoritaire ou minoritaire — personne ne te le dira.
+              </p>
+            </>
+          )}
         </div>
 
         {streamerMode && <p className="mt-4 text-xs text-paper-faint">Contenu masqué — touche &laquo;&nbsp;Mode streamer&nbsp;&raquo; pour le révéler.</p>}
@@ -255,11 +377,11 @@ function PhaseRoleReveal({ mySecret, ackRoleReveal }: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// ORDRE DE JEU (section 7)
+// ORDRE DE JEU
 // ---------------------------------------------------------------------------
 function PhaseRoundStart({ state }: Props) {
   return (
-    <PhaseShell eyebrow="La partie commence" title="Ordre de passage">
+    <PhaseShell eyebrow={`Manche ${state.roundNumber}`} title="Ordre de passage">
       <ol className="flex flex-col gap-2">
         {state.turnOrder.map((id, i) => {
           const p = state.players.find((pl) => pl.id === id);
@@ -384,7 +506,7 @@ function TurnProgress({ state }: { state: Props["state"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// LECTURE DE L'INDICE — titre/artiste visibles dès l'envoi (pas d'anonymisation)
+// LECTURE DE L'INDICE — démarre automatiquement, sans clic (demande explicite)
 // ---------------------------------------------------------------------------
 function PhaseCluePlayback({ state }: Props) {
   const clue = state.clues[state.clues.length - 1];
@@ -420,30 +542,48 @@ function PhaseNextPlayer({ state }: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// DISCUSSION + RÉÉCOUTE — titres et artistes visibles, ça fait partie du jeu
+// DISCUSSION — plafonnée à 5 minutes ; tout le monde doit cliquer "Passer
+// au vote" pour lancer le vote (demande explicite), l'hôte garde un
+// raccourci pour forcer en cas de blocage.
 // ---------------------------------------------------------------------------
-function PhaseDiscussion({ state, playerId, hostAdvanceDiscussion }: Props) {
+function PhaseDiscussion({ state, playerId, markDiscussionReady, hostAdvanceDiscussion }: Props) {
+  const [readySent, setReadySent] = useState(false);
   const isHost = state.hostPlayerId === playerId;
+  const alive = state.players.filter((p) => p.isAlive);
+
+  function handleReady() {
+    if (readySent) return;
+    markDiscussionReady();
+    setReadySent(true);
+  }
+
   return (
     <PhaseShell
       wide
-      eyebrow="Discussion"
-      title="Qui a un thème différent ?"
+      eyebrow={`Manche ${state.roundNumber} — Discussion`}
+      title={readySent ? "En attente des autres…" : "Qui a un thème différent ?"}
       subtitle="Réécoutez les indices et discutez à voix haute."
       footer={
-        isHost ? (
-          <Button fullWidth variant="secondary" onClick={() => hostAdvanceDiscussion()}>
-            Passer au vote
+        <div className="flex flex-col gap-2">
+          <Button fullWidth variant={readySent ? "secondary" : "primary"} disabled={readySent} onClick={handleReady}>
+            {readySent ? "Prêt à voter ✓" : "Passer au vote"}
           </Button>
-        ) : (
-          state.phaseDeadline && (
-            <div className="flex justify-center">
-              <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.discussionSeconds * 1000} />
-            </div>
-          )
-        )
+          {isHost && (
+            <button onClick={() => hostAdvanceDiscussion()} className="text-center text-xs text-paper-faint hover:text-paper-muted">
+              Forcer le vote maintenant (outil hôte)
+            </button>
+          )}
+        </div>
       }
     >
+      {state.phaseDeadline && (
+        <div className="mb-4 flex justify-center">
+          <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.discussionSeconds * 1000} />
+        </div>
+      )}
+      <p className="mb-4 text-center text-sm text-paper-faint">
+        Prêts à voter : {state.discussionReadyCount} / {alive.length}
+      </p>
       <CluesReplayList state={state} />
     </PhaseShell>
   );
@@ -482,6 +622,7 @@ function CluesReplayList({ state }: { state: Props["state"] }) {
                   artist={clue.artist}
                   thumbnailUrl={clue.thumbnailUrl}
                   clipSeconds={clue.clipSeconds}
+                  autoPlay
                 />
               </div>
             )}
@@ -493,33 +634,41 @@ function CluesReplayList({ state }: { state: Props["state"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// VOTE — corrigé : le compteur "votes reçus" utilisait un champ qui ne se
-// mettait à jour qu'après coup (state.lastVoteTally), donc il restait bloqué
-// à 0 pendant toute la phase de vote, même quand les votes étaient bien pris
-// en compte côté serveur. On utilise maintenant votesSubmittedCount, mis à
-// jour en direct, et on affiche une confirmation explicite une fois voté.
+// VOTE — plusieurs suspects possibles, plusieurs éliminations possibles.
+// Toute personne recevant la majorité absolue des votes est éliminée : plus
+// de second tour d'égalité, une seule salve de votes suffit même avec
+// plusieurs "méchants" en jeu.
 // ---------------------------------------------------------------------------
 function PhaseVoting({ state, playerId, submitVote }: Props) {
-  const [votedFor, setVotedFor] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [voteSent, setVoteSent] = useState(false);
   const alive = state.players.filter((p) => p.isAlive);
-  const eligible = state.pendingTieBreak?.length
-    ? alive.filter((p) => state.pendingTieBreak!.includes(p.id))
-    : alive.filter((p) => p.id !== playerId);
+  const eligible = alive.filter((p) => p.id !== playerId);
+
+  function toggle(id: string) {
+    if (voteSent) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function castVote() {
-    if (!votedFor || voteSent) return;
-    submitVote(votedFor);
+    if (voteSent) return;
+    submitVote([...selected]);
     setVoteSent(true);
   }
 
   return (
     <PhaseShell
-      eyebrow={state.pendingTieBreak ? "Égalité — second tour" : "Vote"}
-      title={voteSent ? "Vote envoyé ✓" : "Qui veux-tu éliminer ?"}
+      eyebrow="Vote"
+      title={voteSent ? "Vote envoyé ✓" : "Qui soupçonnes-tu ?"}
+      subtitle={voteSent ? undefined : "Coche un ou plusieurs suspects. La majorité absolue élimine."}
       footer={
-        <Button fullWidth disabled={!votedFor || voteSent} onClick={castVote}>
-          {voteSent ? "Vote enregistré ✓" : "Voter"}
+        <Button fullWidth disabled={voteSent} onClick={castVote}>
+          {voteSent ? "Vote enregistré ✓" : selected.size === 0 ? "Voter pour personne" : `Voter (${selected.size})`}
         </Button>
       }
     >
@@ -529,18 +678,28 @@ function PhaseVoting({ state, playerId, submitVote }: Props) {
         </div>
       )}
       <div className={`flex flex-col gap-2 ${voteSent ? "pointer-events-none opacity-50" : ""}`}>
-        {eligible.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setVotedFor(p.id)}
-            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-              votedFor === p.id ? "border-signal bg-signal-dim/40" : "border-ink-border bg-ink-elevated"
-            }`}
-          >
-            <Avatar emoji={p.avatar} size="sm" />
-            <span className="flex-1 text-sm">{p.nickname}</span>
-          </button>
-        ))}
+        {eligible.map((p) => {
+          const checked = selected.has(p.id);
+          return (
+            <button
+              key={p.id}
+              onClick={() => toggle(p.id)}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                checked ? "border-signal bg-signal-dim/40" : "border-ink-border bg-ink-elevated"
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                  checked ? "border-signal bg-signal text-white" : "border-ink-border"
+                }`}
+              >
+                {checked && <Check size={14} />}
+              </span>
+              <Avatar emoji={p.avatar} size="sm" />
+              <span className="flex-1 text-sm">{p.nickname}</span>
+            </button>
+          );
+        })}
       </div>
       <p className="mt-4 text-center text-sm text-paper-faint">
         Votes reçus : {state.votesSubmittedCount} / {alive.length}
@@ -553,84 +712,142 @@ function PhaseVoting({ state, playerId, submitVote }: Props) {
 function PhaseVoteResult({ state }: Props) {
   const tally = state.lastVoteTally ?? {};
   const max = Math.max(1, ...Object.values(tally));
+  const eliminatedCount = state.lastEliminatedPlayerIds.length;
+  const shown = state.players.filter((p) => p.isAlive || state.lastEliminatedPlayerIds.includes(p.id));
+
   return (
-    <PhaseShell eyebrow="Résultat" title={state.lastEliminatedPlayerId ? "Le vote tombe…" : "Personne n'est éliminé"}>
+    <PhaseShell eyebrow="Résultat" title={eliminatedCount > 0 ? "Le vote tombe…" : "Personne n'est éliminé"}>
       <div className="flex flex-col gap-3">
-        {state.players
-          .filter((p) => p.isAlive)
-          .map((p) => (
+        {shown.map((p) => {
+          const eliminated = state.lastEliminatedPlayerIds.includes(p.id);
+          return (
             <div key={p.id} className="flex items-center gap-3">
-              <Avatar emoji={p.avatar} size="sm" />
+              <Avatar emoji={p.avatar} size="sm" dimmed={eliminated} />
               <span className="w-20 truncate text-sm">{p.nickname}</span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-border">
                 <div
-                  className="h-full rounded-full bg-signal transition-all duration-500"
+                  className={`h-full rounded-full transition-all duration-500 ${eliminated ? "bg-signal" : "bg-wave"}`}
                   style={{ width: `${((tally[p.id] ?? 0) / max) * 100}%` }}
                 />
               </div>
               <span className="w-4 text-right text-sm text-paper-muted">{tally[p.id] ?? 0}</span>
             </div>
-          ))}
+          );
+        })}
       </div>
     </PhaseShell>
   );
 }
 
 function PhaseElimination({ state }: Props) {
-  const eliminated = state.players.find((p) => p.id === state.lastEliminatedPlayerId);
-  const roleLabel: Record<string, string> = { civil: "CIVIL", undercover: "INFILTRÉ" };
+  const eliminated = state.players.filter((p) => state.lastEliminatedPlayerIds.includes(p.id));
+
+  if (eliminated.length === 0) {
+    return (
+      <PhaseShell title="Personne n'est éliminé">
+        <div className="flex flex-col items-center gap-4 py-10 text-center">
+          <p className="text-paper-muted">Le camp adverse s&apos;en sort cette manche.</p>
+        </div>
+      </PhaseShell>
+    );
+  }
+
   return (
-    <PhaseShell title={`${eliminated?.nickname ?? "?"} est éliminé`}>
-      <div className="flex flex-col items-center gap-4 py-10">
-        <Avatar emoji={eliminated?.avatar ?? "💀"} size="lg" dimmed />
-        <p className="text-paper-muted">était…</p>
-        <p className="font-display text-2xl text-signal">{state.lastEliminatedRole ? roleLabel[state.lastEliminatedRole] : "…"}</p>
+    <PhaseShell title={eliminated.length === 1 ? `${eliminated[0]!.nickname} est éliminé` : `${eliminated.length} joueurs sont éliminés`}>
+      <div className="flex flex-col gap-3">
+        {eliminated.map((p) => (
+          <div key={p.id} className="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-border bg-ink-elevated p-5 text-center">
+            <Avatar emoji={p.avatar} size="lg" dimmed />
+            <p className="mt-1 text-sm text-paper">{p.nickname}</p>
+            <p className="text-xs text-paper-muted">était…</p>
+            <p className="font-display text-xl text-signal">{ROLE_LABEL[state.lastEliminatedRoles[p.id]!]?.toUpperCase() ?? "…"}</p>
+          </div>
+        ))}
       </div>
     </PhaseShell>
   );
 }
 
 // ---------------------------------------------------------------------------
-// FIN DE PARTIE + RÉVÉLATION + REVANCHE
-//
-// Récapitulatif : le nom de chaque joueur est la première information
-// affichée, aussi bien pour les rôles que pour l'historique des musiques
-// (plutôt qu'un détail secondaire à côté du titre du morceau).
+// RÉSULTAT DE LA MANCHE — points distribués individuellement. Infiltré(s) et
+// Mr White ne forment pas une équipe entre eux : chacun gagne selon SA
+// PROPRE survie au vote, pas selon le sort des autres joueurs de son rôle.
+// Les rôles de toute la manche sont révélés ici (elle est terminée) : c'est
+// ce qui permet à chacun de comprendre pourquoi son score a changé, alors
+// que personne ne connaissait son propre rôle avant cet instant.
 // ---------------------------------------------------------------------------
-function PhaseGameOver({ state, playerId, rematch }: Props) {
-  const isHost = state.hostPlayerId === playerId;
-  const winnerLabel = { civil: "LES CIVILS GAGNENT", undercover: "L'INFILTRÉ GAGNE" };
-  const roleLabel: Record<string, string> = { civil: "Civil", undercover: "Infiltré" };
+function PhaseRoundResult({ state }: Props) {
+  const roles = state.lastRoundRoles ?? {};
+  const sorted = [...state.players].sort((a, b) => b.score - a.score);
 
   return (
     <PhaseShell
-      eyebrow="Partie terminée"
-      title={state.winner ? winnerLabel[state.winner] : "Fin de partie"}
+      eyebrow={`Manche ${state.roundNumber} terminée`}
+      title="Résultat de la manche"
+      subtitle="La manche suivante démarre automatiquement…"
+    >
+      <div className="flex flex-col gap-2">
+        {sorted.map((p) => {
+          const role = roles[p.id];
+          const survived = !state.lastEliminatedPlayerIds.includes(p.id);
+          const earned = role && survived ? (role === "civil" ? 1 : 2) : 0;
+          return (
+            <div key={p.id} className="flex items-center gap-3 rounded-xl bg-ink-elevated px-3 py-2.5">
+              <Avatar emoji={p.avatar} size="sm" dimmed={!survived} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-paper">{p.nickname}</p>
+                <p className="text-xs text-paper-faint">
+                  {role ? ROLE_LABEL[role] : ""} · {survived ? "a survécu" : "éliminé"}
+                </p>
+              </div>
+              {earned > 0 && <span className="text-sm font-medium text-wave">+{earned}</span>}
+              <span className="w-10 text-right font-display text-sm text-paper">{p.score} pt{p.score !== 1 ? "s" : ""}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-center text-xs text-paper-faint">Score à atteindre pour gagner le match : {state.settings.targetScore}</p>
+    </PhaseShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FIN DE MATCH + RÉVÉLATION + REVANCHE
+// ---------------------------------------------------------------------------
+function PhaseGameOver({ state, playerId, rematch }: Props) {
+  const isHost = state.hostPlayerId === playerId;
+  const champions = new Set(state.matchWinnerIds ?? []);
+  const sorted = [...state.players].sort((a, b) => b.score - a.score);
+  const championNames = state.players.filter((p) => champions.has(p.id)).map((p) => p.nickname);
+
+  return (
+    <PhaseShell
+      eyebrow="Match terminé"
+      title={championNames.length === 1 ? `${championNames[0]} remporte le match` : `${championNames.join(", ")} remportent le match`}
       footer={
         isHost && (
           <Button fullWidth onClick={() => rematch()}>
-            Rejouer
+            Revanche
           </Button>
         )
       }
     >
       <div className="mb-8 flex flex-col gap-2">
-        {state.players.map((p) => {
-          const info = state.reveal?.roles[p.id];
-          return (
-            <div key={p.id} className="flex items-center gap-3 rounded-xl bg-ink-elevated px-3 py-2.5">
-              <Avatar emoji={p.avatar} size="sm" />
-              <span className="flex-1 text-sm font-medium text-paper">{p.nickname}</span>
-              <span className={`text-xs font-medium uppercase ${info?.role === "undercover" ? "text-signal" : "text-wave"}`}>
-                {info ? roleLabel[info.role] : ""}
-              </span>
-            </div>
-          );
-        })}
+        {sorted.map((p) => (
+          <div
+            key={p.id}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${champions.has(p.id) ? "border border-signal/50 bg-signal-dim/30" : "bg-ink-elevated"}`}
+          >
+            <Avatar emoji={p.avatar} size="sm" />
+            <span className="flex-1 text-sm font-medium text-paper">{p.nickname}</span>
+            {champions.has(p.id) && <span className="text-sm">🏆</span>}
+            <span className="font-display text-sm text-paper">{p.score} pt{p.score !== 1 ? "s" : ""}</span>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="mb-1 text-sm font-medium text-paper-muted">Les musiques de la partie</p>
+        <p className="mb-1 text-sm font-medium text-paper-muted">Musiques de la dernière manche</p>
         {(state.reveal?.clues ?? []).map((clue) => {
           const owner = state.players.find((p) => p.id === clue.playerId);
           return (

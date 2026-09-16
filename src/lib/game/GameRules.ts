@@ -1,30 +1,24 @@
 import type { Role } from "@/types";
 
-/**
- * Une partie = un thème, un seul infiltré, une seule manche de vote. Le
- * résultat se déduit directement de qui a été éliminé (ou de personne, en
- * cas d'égalité persistante) : pas de logique de "manches successives" à
- * suivre ici.
- */
+// ---------------------------------------------------------------------------
+// Les points sont entièrement individuels : infiltré(s) et Mr White ne
+// forment PAS une équipe entre eux, chacun gagne (ou pas) selon sa propre
+// survie au vote de la manche — pas selon le sort des autres joueurs de son
+// "camp". Un infiltré démasqué gagne 0 même si un autre infiltré ou Mr
+// White survit à côté de lui.
+// ---------------------------------------------------------------------------
 export const GameRules = {
-  /**
-   * @param eliminatedRole Le rôle du joueur éliminé par le vote, ou `null`
-   *   si personne n'a été éliminé (aucun vote, ou égalité qui persiste après
-   *   le second tour).
-   */
-  resolveOutcome(eliminatedRole: Role | null): Role {
-    // Les civils gagnent uniquement s'ils ont correctement démasqué
-    // l'infiltré. Dans tout autre cas — un civil éliminé par erreur, ou
-    // personne d'éliminé du tout — l'infiltré s'en sort et gagne.
-    return eliminatedRole === "undercover" ? "civil" : "undercover";
+  /** Points gagnés par UN joueur pour cette manche, selon son propre rôle et sa propre survie. */
+  pointsFor(role: Role, survived: boolean): number {
+    if (!survived) return 0;
+    return role === "civil" ? 1 : 2;
   },
 
-  /** Résout une égalité de vote : renvoie les joueurs à départager. */
-  resolveTie(tally: Record<string, number>): string[] {
-    const max = Math.max(0, ...Object.values(tally));
-    if (max === 0) return [];
+  /** Joueurs ayant reçu la majorité absolue des votes — peut en renvoyer plusieurs, ou aucun. */
+  resolveMajority(tally: Record<string, number>, aliveCount: number): string[] {
+    const threshold = Math.floor(aliveCount / 2) + 1;
     return Object.entries(tally)
-      .filter(([, count]) => count === max)
+      .filter(([, count]) => count >= threshold)
       .map(([playerId]) => playerId);
   }
 };

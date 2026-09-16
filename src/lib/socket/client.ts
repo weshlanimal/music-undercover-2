@@ -39,7 +39,8 @@ interface UseGameSocketReturn {
   startGame: () => void;
   ackRoleReveal: () => void;
   submitMusicUrl: (url: string) => void;
-  submitVote: (targetId: string) => void;
+  submitVote: (targetIds: string[]) => void;
+  markDiscussionReady: () => void;
   hostAdvanceDiscussion: () => void;
   hostForceNextPhase: () => void;
   hostRemovePlayer: (targetId: string) => void;
@@ -121,7 +122,8 @@ export function useGameSocket(): UseGameSocketReturn {
     startGame: () => emit(ClientEvents.START_GAME),
     ackRoleReveal: () => emit(ClientEvents.ACK_ROLE_REVEAL),
     submitMusicUrl: (url) => emit(ClientEvents.SUBMIT_MUSIC_URL, { url }),
-    submitVote: (targetId) => emit(ClientEvents.SUBMIT_VOTE, { targetId }),
+    submitVote: (targetIds) => emit(ClientEvents.SUBMIT_VOTE, { targetIds }),
+    markDiscussionReady: () => emit(ClientEvents.DISCUSSION_READY),
     hostAdvanceDiscussion: () => emit(ClientEvents.HOST_ADVANCE_DISCUSSION),
     hostForceNextPhase: () => emit(ClientEvents.HOST_FORCE_NEXT_PHASE),
     hostRemovePlayer: (targetId) => emit(ClientEvents.HOST_REMOVE_PLAYER, { targetId }),

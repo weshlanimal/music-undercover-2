@@ -170,12 +170,19 @@ export function attachSocketServer(io: Server): void {
       await engine?.submitMusicUrl(data.playerId, payload.url ?? "");
     });
 
-    socket.on(ClientEvents.SUBMIT_VOTE, (payload: { targetId: string }) => {
+    socket.on(ClientEvents.SUBMIT_VOTE, (payload: { targetIds: string[] }) => {
       if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
       const engine = engineFor(io, data.roomCode);
-      const result = engine?.submitVote(data.playerId, payload.targetId);
+      const result = engine?.submitVote(data.playerId, Array.isArray(payload?.targetIds) ? payload.targetIds : []);
       if (result && !result.ok) fail(socket, result.error);
     });
+
+    socket.on(
+      ClientEvents.DISCUSSION_READY,
+      withEngine((engine, playerId) => {
+        engine.markDiscussionReady(playerId);
+      })
+    );
 
     socket.on(
       ClientEvents.HOST_ADVANCE_DISCUSSION,
