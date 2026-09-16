@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
+import { VolumeControl } from "./VolumeControl";
+import { useLocalVolume } from "@/hooks/useLocalVolume";
 
 interface AudioPlayerProps {
   src: string;
@@ -23,10 +25,13 @@ export function AudioPlayer({ src, label, autoPlay, syncStartAt }: AudioPlayerPr
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [needsUnlock, setNeedsUnlock] = useState(autoPlay ?? false);
+  const { volume, setVolume } = useLocalVolume();
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    audio.volume = volume / 100;
 
     if (syncStartAt) {
       const elapsedSeconds = Math.max(0, (Date.now() - syncStartAt) / 1000);
@@ -38,6 +43,11 @@ export function AudioPlayer({ src, label, autoPlay, syncStartAt }: AudioPlayerPr
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
+
+  function handleVolumeChange(next: number) {
+    setVolume(next);
+    if (audioRef.current) audioRef.current.volume = next / 100;
+  }
 
   function unlockAndPlay() {
     audioRef.current?.play().then(() => {
@@ -66,7 +76,10 @@ export function AudioPlayer({ src, label, autoPlay, syncStartAt }: AudioPlayerPr
         ref={audioRef}
         src={src}
         preload="auto"
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onLoadedMetadata={(e) => {
+          setDuration(e.currentTarget.duration || 0);
+          e.currentTarget.volume = volume / 100;
+        }}
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
@@ -105,6 +118,10 @@ export function AudioPlayer({ src, label, autoPlay, syncStartAt }: AudioPlayerPr
           </div>
         </div>
       )}
+
+      <div className="-mx-5 -mb-5 mt-4 border-t border-ink-border">
+        <VolumeControl volume={volume} onChange={handleVolumeChange} />
+      </div>
     </div>
   );
 }

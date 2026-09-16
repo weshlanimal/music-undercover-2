@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { AudioPlayer } from "./AudioPlayer";
+import { VolumeControl } from "./VolumeControl";
+import { useLocalVolume } from "@/hooks/useLocalVolume";
 import type { MusicProviderName } from "@/types";
 import type { PlaybackControlEvent } from "@/lib/socket/client";
 
@@ -54,6 +56,9 @@ interface YTPlayer {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
   getPlayerState(): number;
+  setVolume(volume: number): void;
+  mute(): void;
+  unMute(): void;
   destroy(): void;
 }
 const YT_STATE_PLAYING = 1;
@@ -88,6 +93,9 @@ export function ClueMedia({
   const [needsJoin, setNeedsJoin] = useState(false);
   const [started, setStarted] = useState(!!autoPlay || !!isController);
   const canInteract = !!interactive || !!isController;
+  const { volume, setVolume } = useLocalVolume();
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
   const isYouTube = provider === "youtube" && !!videoId;
 
@@ -114,6 +122,11 @@ export function ClueMedia({
           onReady: () => {
             if (cancelled) return;
             setReady(true);
+            // Le volume est TOUJOURS local, même pour un spectateur dont le
+            // lecteur est par ailleurs verrouillé (lecture/pause pilotées à
+            // distance) — sa préférence de volume, elle, ne l'est jamais.
+            playerRef.current?.setVolume(volumeRef.current);
+            if (volumeRef.current === 0) playerRef.current?.mute();
             if ((isController || autoPlay) && started) playerRef.current?.playVideo();
           },
           onStateChange: (e: { data: number }) => {
@@ -164,6 +177,14 @@ export function ClueMedia({
     setNeedsJoin(false);
   }
 
+  function handleVolumeChange(next: number) {
+    setVolume(next);
+    if (!playerRef.current) return;
+    playerRef.current.setVolume(next);
+    if (next === 0) playerRef.current.mute();
+    else playerRef.current.unMute();
+  }
+
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-ink-border bg-ink-elevated">
       <div className="p-4 pb-3">
@@ -173,17 +194,22 @@ export function ClueMedia({
 
       {isYouTube ? (
         started ? (
-          <div className="relative aspect-video w-full bg-black">
-            <div ref={containerRef} className={`h-full w-full ${canInteract ? "" : "pointer-events-none"}`} />
-            {needsJoin && (
-              <button
-                onClick={joinPlayback}
-                className="absolute inset-0 flex items-center justify-center bg-black/70 text-sm font-medium text-white"
-              >
-                🔊 Rejoindre la lecture
-              </button>
-            )}
-          </div>
+          <>
+            <div className="relative aspect-video w-full bg-black">
+              <div ref={containerRef} className={`h-full w-full ${canInteract ? "" : "pointer-events-none"}`} />
+              {needsJoin && (
+                <button
+                  onClick={joinPlayback}
+                  className="absolute inset-0 flex items-center justify-center bg-black/70 text-sm font-medium text-white"
+                >
+                  🔊 Rejoindre la lecture
+                </button>
+              )}
+            </div>
+            {/* Toujours cliquable, y compris pour un spectateur dont la vidéo
+                elle-même est verrouillée : le volume reste personnel. */}
+            <VolumeControl volume={volume} onChange={handleVolumeChange} />
+          </>
         ) : (
           <button onClick={() => setStarted(true)} className="group relative block aspect-video w-full bg-black" aria-label="Lire l'extrait">
             {thumbnailUrl && (
