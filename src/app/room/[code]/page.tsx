@@ -11,6 +11,7 @@ import { PhaseShell } from "@/components/PhaseShell";
 import { CountdownRing } from "@/components/CountdownRing";
 import { ClueMedia } from "@/components/ClueMedia";
 import { QuitButton } from "@/components/QuitButton";
+import { RestartMatchButton } from "@/components/RestartMatchButton";
 import { ReactionOverlay } from "@/components/ReactionOverlay";
 import { ReactionPicker } from "@/components/ReactionPicker";
 import { useGameSocket } from "@/lib/socket/client";
@@ -24,7 +25,7 @@ export default function RoomPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const socket = useGameSocket();
-  const { state, playerId, connected, errorMessage, mySecret, leaveRoom, reactions, removeReaction } = socket;
+  const { state, playerId, connected, errorMessage, mySecret, leaveRoom, reactions, removeReaction, rematch } = socket;
 
   function handleQuit() {
     leaveRoom();
@@ -57,10 +58,15 @@ export default function RoomPage() {
   // sauf pendant l'écran de révélation lui-même (qui l'affiche déjà en
   // grand) et hors partie (lobby / fin de match, où le récap prend le relais).
   const showThemeBadge = state.status === "in_progress" && state.phase !== "role_reveal" && !!mySecret;
+  // "Recommencer" en cours de partie : réservé à l'hôte, inutile en lobby
+  // (rien à recommencer) ou une fois finie (le bouton "Revanche" de l'écran
+  // de fin fait déjà exactement ça).
+  const showRestartButton = state.status === "in_progress" && state.hostPlayerId === playerId;
 
   return (
     <>
       <QuitButton onQuit={handleQuit} />
+      {showRestartButton && <RestartMatchButton onRestart={rematch} />}
       <ReactionOverlay reactions={reactions} onExpire={removeReaction} />
       {showThemeBadge && <MyThemeBadge secret={mySecret!} />}
       <RoomByPhase key={state.phase} {...socket} state={state} playerId={playerId} />
@@ -706,17 +712,63 @@ function PhaseVoting({ state, playerId, submitVote }: Props) {
 }
 
 // ---------------------------------------------------------------------------
+// Rappel du thème — affiché sur les écrans de fin de manche pour que tout le
+// monde se souvienne de quoi on parlait (demande explicite).
+// ---------------------------------------------------------------------------
+function ThemeReminder({ theme }: { theme: { civilTheme: string; undercoverTheme: string } | null }) {
+  if (!theme) return null;
+  return (
+    <div className="mb-5 rounded-2xl border border-ink-border bg-ink-elevated p-4 text-center">
+      <p className="text-xs uppercase tracking-wide text-paper-faint">Rappel du thème</p>
+      <p className="mt-2 text-sm text-paper">
+        <span className="text-paper-muted">Civils —</span> {theme.civilTheme}
+      </p>
+      <p className="mt-1 text-sm text-paper">
+        <span className="text-paper-muted">Infiltré —</span> {theme.undercoverTheme}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Pied de page commun aux écrans de fin de manche : un clic de l'hôte fait
+ * avancer tout le monde (demande explicite — plus de minuteur automatique
+ * ici, le temps de lire ce qui vient de se passer).
+ */
+function HostContinueFooter({ isHost, onContinue, label = "Continuer" }: { isHost: boolean; onContinue: () => void; label?: string }) {
+  const [clicked, setClicked] = useState(false);
+  if (!isHost) {
+    return <p className="text-center text-xs text-paper-faint">En attente de l&apos;hôte pour continuer…</p>;
+  }
+  return (
+    <Button
+      fullWidth
+      disabled={clicked}
+      onClick={() => {
+        setClicked(true);
+        onContinue();
+      }}
+    >
+      {clicked ? "…" : label}
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // RÉVÉLATION — combine les deux tours de vote (jamais montrée avant que les
 // deux soient clos) : qui a été accusé d'être l'infiltré, qui a été accusé
 // d'être Mr White, si c'était juste ou faux, puis le rôle réel des
-// éliminé·e·s.
+// éliminé·e·s. L'hôte clique pour continuer quand tout le monde a eu le
+// temps de lire.
 // ---------------------------------------------------------------------------
-function PhaseElimination({ state }: Props) {
+function PhaseElimination({ state, playerId, hostForceNextPhase }: Props) {
   const reveal = state.voteReveal;
   const eliminated = state.players.filter((p) => state.lastEliminatedPlayerIds.includes(p.id));
+  const isHost = state.hostPlayerId === playerId;
 
   return (
-    <PhaseShell title="Résultat du vote">
+    <PhaseShell title="Résultat du vote" footer={<HostContinueFooter isHost={isHost} onContinue={hostForceNextPhase} />}>
+      <ThemeReminder theme={state.lastRoundTheme} />
       {reveal && (
         <div className="mb-6 flex flex-col gap-4">
           <VoteRoundResult
@@ -880,18 +932,27 @@ function VoteRoundResult({
 // ce qui permet à chacun de comprendre pourquoi son score a changé, alors
 // que personne ne connaissait son propre rôle avant cet instant.
 // ---------------------------------------------------------------------------
-function PhaseRoundResult({ state }: Props) {
+function PhaseRoundResult({ state, playerId, hostForceNextPhase }: Props) {
   const roles = state.lastRoundRoles ?? {};
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
   const guessResult = state.mrWhiteGuessResult;
   const guesser = state.players.find((p) => roles[p.id] === "mrwhite");
+  const isHost = state.hostPlayerId === playerId;
+  const matchWillEnd = state.players.some((p) => p.score >= state.settings.targetScore);
 
   return (
     <PhaseShell
       eyebrow={`Manche ${state.roundNumber} terminée`}
       title="Résultat de la manche"
-      subtitle="La manche suivante démarre automatiquement…"
+      footer={
+        <HostContinueFooter
+          isHost={isHost}
+          onContinue={hostForceNextPhase}
+          label={matchWillEnd ? "Voir le classement final" : "Manche suivante"}
+        />
+      }
     >
+      <ThemeReminder theme={state.lastRoundTheme} />
       {guessResult && (
         <div
           className={`mb-4 rounded-2xl border p-4 text-center ${

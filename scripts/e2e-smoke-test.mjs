@@ -237,7 +237,22 @@ async function scenarioMainMatch() {
   );
   assert(alex.state.lastEliminatedRoles[undercoverPlayer.playerId] === "undercover", "Le rôle révélé à l'élimination est bien 'undercover'");
 
+  // Plus d'enchaînement automatique (demande explicite) : la phase ne bouge
+  // pas toute seule, et seul l'hôte peut la faire avancer.
+  await wait(1500);
+  assert(alex.state.phase === "elimination", "La révélation reste affichée tant que l'hôte n'a pas cliqué pour continuer (plus de minuteur automatique)");
+  // sarah/lucas ont rejoint via room:join — jamais l'hôte, quel que soit le
+  // rôle que le tirage leur a donné (contrairement à civilA/civilB, qui
+  // pourraient être Alex lui-même selon le tirage).
+  sarah.clearError();
+  sarah.socket.emit("host:force_next_phase", {});
+  await waitFor(() => sarah.lastError, "Un joueur qui n'est pas l'hôte ne peut pas faire avancer la révélation");
+  alex.socket.emit("host:force_next_phase", {});
   await waitForPhase(alex, "round_result", 6000);
+  assert(
+    alex.state.lastRoundTheme?.civilTheme && alex.state.lastRoundTheme?.undercoverTheme,
+    "Le thème de la manche (civils ET infiltré) est rappelé au résultat"
+  );
   assert(
     alex.state.lastRoundRoles[undercoverPlayer.playerId] === "undercover" && alex.state.lastRoundRoles[civilA.playerId] === "civil",
     "Tous les rôles de la manche sont révélés au moment du résultat (plus personne n'a besoin de les cacher)"
@@ -247,7 +262,8 @@ async function scenarioMainMatch() {
   assert(civilScore === 1, `Le civil survivant gagne +1 point individuellement (score=${civilScore})`);
   assert(undercoverScore === 0, `L'infiltré éliminé gagne 0 point (score=${undercoverScore})`);
 
-  // --- Score cible = 1 : le match doit se terminer immédiatement ---
+  // --- Score cible = 1 : le match doit se terminer une fois l'hôte a cliqué pour continuer ---
+  alex.socket.emit("host:force_next_phase", {});
   await waitForPhase(alex, "game_over", 8000);
   assert(alex.state.status === "finished", "Le match se termine dès qu'un score cible est atteint");
   assert(
@@ -335,14 +351,11 @@ async function scenarioTwoVoteRounds() {
 }
 
 // ---------------------------------------------------------------------------
-// Scénario 3 : enchaînement automatique des manches (score cible non atteint).
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Mr White démasqué a une dernière chance de deviner le thème des civils —
-// correct = il compte comme survivant (mêmes points) ; faux = reste éliminé.
-// Scindé en deux scénarios (au lieu d'un seul) pour laisser à chacun un
-// budget de temps réaliste — une manche complète en mode démo prend déjà
-// 15-20s à elle seule, et ce mécanisme en ajoute une par cas testé.
+// Scénario : dernière chance de Mr White (démasqué, il devine le thème des
+// civils). Correct = compte comme survivant (mêmes points) ; faux = reste
+// éliminé. Scindé en deux scénarios (au lieu d'un seul) pour laisser à
+// chacun un budget de temps réaliste — une manche complète en mode démo
+// prend déjà 15-20s à elle seule.
 // ---------------------------------------------------------------------------
 async function scenarioMrWhiteLastChance() {
   // --- Cas 1 : Mr White devine juste -> il s'en sort, gagne ses points ---
@@ -387,6 +400,8 @@ async function scenarioMrWhiteLastChance() {
   players.filter((p) => p !== mrWhitePlayer).forEach((p) => p.socket.emit("vote:submit", { targetId: mrWhitePlayer.playerId }));
   mrWhitePlayer.socket.emit("vote:submit", { targetId: civilGroup[1].playerId });
 
+  await Promise.all(players.map((p) => waitForPhase(p, "elimination", 8000)));
+  p1.socket.emit("host:force_next_phase", {});
   await Promise.all(players.map((p) => waitForPhase(p, "mrwhite_guess", 10_000)));
   assert(p1.state.mrWhiteGuessPlayerId === mrWhitePlayer.playerId, "La dernière chance est bien proposée à Mr White, démasqué par le vote");
 
@@ -443,6 +458,8 @@ async function scenarioMrWhiteLastChanceCorrectGuess() {
 
   players2.filter((p) => p !== mrWhite2).forEach((p) => p.socket.emit("vote:submit", { targetId: mrWhite2.playerId }));
   mrWhite2.socket.emit("vote:submit", { targetId: civilGroup2[1].playerId });
+  await Promise.all(players2.map((p) => waitForPhase(p, "elimination", 8000)));
+  q1.socket.emit("host:force_next_phase", {});
   await Promise.all(players2.map((p) => waitForPhase(p, "mrwhite_guess", 10_000)));
 
   // Réponse correcte mais volontairement mal casée/accentuée/espacée : la
@@ -458,6 +475,9 @@ async function scenarioMrWhiteLastChanceCorrectGuess() {
   players2.forEach((p) => p.socket.disconnect());
 }
 
+// ---------------------------------------------------------------------------
+// Scénario : enchaînement automatique des manches (score cible non atteint).
+// ---------------------------------------------------------------------------
 async function scenarioRoundContinuation() {
   const a2 = makeClient("Nora");
   const b2 = makeClient("Yanis");
@@ -489,13 +509,17 @@ async function scenarioRoundContinuation() {
   pB.socket.emit("vote:submit", { targetId: pC.playerId });
   pC.socket.emit("vote:submit", { targetId: pA.playerId });
 
-  await waitForPhase(a2, "round_result", 8000);
+  await waitForPhase(a2, "elimination", 8000);
   assert(a2.state.lastEliminatedPlayerIds.length === 0, "Égalité au premier tour : personne n'est désigné, personne n'est éliminé");
+  a2.socket.emit("host:force_next_phase", {});
+
+  await waitForPhase(a2, "round_result", 8000);
   const totalScore = a2.state.players.reduce((sum, p) => sum + p.score, 0);
   // Score individuel : personne n'étant éliminé, TOUT LE MONDE survit et gagne
   // selon son propre rôle (2 civils +1 chacun, 1 infiltré +2) = 4.
   assert(totalScore === 4, `Chaque joueur gagne ses points individuellement selon son propre rôle (total=${totalScore}, attendu 4)`);
   assert(a2.state.status === "in_progress", "Le match continue (score cible à 100, personne ne l'a atteint)");
+  a2.socket.emit("host:force_next_phase", {});
 
   await waitForPhase(a2, "role_reveal", 8000);
   assert(a2.state.roundNumber === 2, "Une nouvelle manche démarre automatiquement (thème et rôles neufs), sans repasser par le lobby");
@@ -644,6 +668,50 @@ async function scenarioSilentRejoin() {
 // ---------------------------------------------------------------------------
 // Scénario 6 : bouton "Quitter" en lobby.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Bouton "Recommencer" : réservé à l'hôte, utilisable EN COURS de partie
+// (pas seulement à la toute fin comme "Revanche") — remet tout à zéro pour
+// toute la salle, retour au lobby.
+// ---------------------------------------------------------------------------
+async function scenarioRestartMidGame() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
+  await wait(400);
+
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
+  });
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
+
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  assert(alex.state.status === "in_progress", "La partie est bien en cours (pas encore terminée)");
+
+  // Un joueur non-hôte ne peut pas recommencer la partie pour tout le monde.
+  sarah.clearError();
+  sarah.socket.emit("host:rematch", {});
+  await waitFor(() => sarah.lastError, "Un non-hôte ne peut pas recommencer la partie");
+
+  // L'hôte, lui, peut recommencer alors que la partie est encore EN COURS
+  // (pas seulement une fois terminée) — c'est tout le point du bouton.
+  alex.socket.emit("host:rematch", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "lobby", 5000)));
+  assert(alex.state.status === "lobby", "La partie repasse bien en statut lobby");
+  assert(
+    alex.state.players.every((p) => p.score === 0),
+    "Les scores sont remis à zéro"
+  );
+  assert(alex.state.roundNumber === 0, "Le numéro de manche est remis à zéro");
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
 async function scenarioLeaveRoom() {
   const host2 = makeClient("Yasmine");
   const guest2a = makeClient("Kevin");
@@ -682,6 +750,7 @@ async function main() {
   await runScenario("Contrôle de lecture watch2gether + bouton Passer", scenarioPlaybackControlAndSkip, 20_000);
   await runScenario("Réactions emoji (emote spam pendant l'écoute)", scenarioReactions, 20_000);
   await runScenario("Reconnexion silencieuse (bug session inconnue)", scenarioSilentRejoin, 10_000);
+  await runScenario("Recommencer en cours de partie (pas seulement à la fin)", scenarioRestartMidGame, 15_000);
   await runScenario("Quitter la salle en lobby", scenarioLeaveRoom, 15_000);
 
   console.log("\n" + "═".repeat(50));

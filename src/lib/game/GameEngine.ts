@@ -36,8 +36,6 @@ import { RoomStore } from "./RoomStore";
 
 const MIN_PLAYERS_TO_START = 3;
 const NEXT_PLAYER_PAUSE_MS = 1_800;
-const ROUND_RESULT_PAUSE_MS = 4_000;
-const NEXT_ROUND_PAUSE_MS = 2_500;
 const MR_WHITE_GUESS_TIMEOUT_MS = 45_000;
 
 export type EngineResult<T = void> = { ok: true; value: T } | { ok: false; error: string };
@@ -212,6 +210,7 @@ export class GameEngine {
     room.phase = "role_reveal";
     room.lastEliminatedPlayerIds = [];
     room.lastEliminatedRoles = {};
+    room.lastRoundTheme = null;
     room.mrWhiteGuessPlayerId = null;
     room.mrWhiteGuessResult = null;
     this.sendAllSecrets();
@@ -573,10 +572,15 @@ export class GameEngine {
         room.lastEliminatedRoles[id] = player.role!;
       }
     }
+    // Le thème est rappelé dès la révélation (demande explicite) — tout le
+    // monde a de quoi comprendre le vote qui vient de tomber, pas seulement
+    // au résultat de la manche.
+    room.lastRoundTheme = room.themePair ? { civilTheme: room.themePair.civilTheme, undercoverTheme: room.themePair.undercoverTheme } : null;
 
     room.phase = "elimination";
     this.bus.broadcastState(room);
-    this.scheduleTimeout(4_000, () => this.afterElimination());
+    // Pas de délai automatique : on attend que l'hôte clique pour continuer
+    // (demande explicite — le temps de lire, pas juste 4 secondes qui filent).
   }
 
   /** Si Mr White vient d'être démasqué, il a droit à une dernière chance avant de conclure la manche. */
@@ -676,12 +680,19 @@ export class GameEngine {
 
     room.phase = "round_result";
     this.bus.broadcastState(room);
+    // Là aussi, pas de délai automatique : l'hôte clique pour passer à la
+    // manche suivante (ou voir le classement final) quand tout le monde a
+    // eu le temps de lire — voir proceedFromRoundResult().
+  }
 
+  /** Appelé par l'hôte depuis l'écran de résultat de manche — manche suivante, ou fin du match si le score cible est atteint. */
+  private proceedFromRoundResult(): void {
+    const room = this.room;
     const champions = [...room.players.values()].filter((p) => p.score >= room.settings.targetScore);
     if (champions.length > 0) {
-      this.scheduleTimeout(ROUND_RESULT_PAUSE_MS, () => this.concludeMatch(champions.map((c) => c.id)));
+      this.concludeMatch(champions.map((c) => c.id));
     } else {
-      this.scheduleTimeout(ROUND_RESULT_PAUSE_MS + NEXT_ROUND_PAUSE_MS, () => this.beginNewRound());
+      this.beginNewRound();
     }
   }
 
@@ -753,6 +764,12 @@ export class GameEngine {
       case "mrwhite_guess":
         if (room.mrWhiteGuessPlayerId) this.resolveMrWhiteGuess(room.mrWhiteGuessPlayerId, null);
         break;
+      case "elimination":
+        this.afterElimination();
+        break;
+      case "round_result":
+        this.proceedFromRoundResult();
+        break;
       default:
         return { ok: false, error: "Cette phase ne peut pas être forcée." };
     }
@@ -779,12 +796,14 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
-  // ---- Revanche — nouveau match complet, scores remis à zéro ------------------
+  // ---- Recommencer — nouveau match complet, scores remis à zéro. Utilisable
+  // aussi bien depuis l'écran de fin ("Revanche") qu'en cours de partie
+  // ("Recommencer"), jamais depuis le lobby (rien à recommencer). ------------
 
   rematch(hostId: string): EngineResult {
     const room = this.room;
     if (room.hostPlayerId !== hostId) return { ok: false, error: "Seul l'hôte peut relancer." };
-    if (room.status !== "finished") return { ok: false, error: "La partie n'est pas terminée." };
+    if (room.status === "lobby") return { ok: false, error: "La partie n'a pas encore commencé." };
 
     for (const player of room.players.values()) {
       player.isAlive = true;
@@ -807,6 +826,7 @@ export class GameEngine {
     room.mrWhiteTally = null;
     room.lastEliminatedPlayerIds = [];
     room.lastEliminatedRoles = {};
+    room.lastRoundTheme = null;
     room.mrWhiteGuessPlayerId = null;
     room.mrWhiteGuessResult = null;
     room.matchWinnerIds = null;
@@ -901,6 +921,7 @@ export class GameEngine {
       votesSubmittedCount: room.votes.size,
       discussionReadyCount,
       lastRoundRoles: room.lastRoundRoles,
+      lastRoundTheme: room.lastRoundTheme,
       matchWinnerIds: room.matchWinnerIds,
       reveal
     };

@@ -172,6 +172,8 @@ export interface PublicRoomState {
   discussionReadyCount: number;
   /** Rôle de CHAQUE joueur pour la manche qui vient de se conclure — révélé une fois le résultat connu (round_result / game_over), jamais avant. */
   lastRoundRoles: Record<string, Role> | null;
+  /** Les deux thèmes de la manche qui vient de se conclure (civil et infiltré) — révélés en même temps que lastRoundRoles, pour se rappeler de quoi il s'agissait. */
+  lastRoundTheme: { civilTheme: string; undercoverTheme: string } | null;
   /** Rempli uniquement en game_over : le ou les joueurs ayant atteint le score cible. */
   matchWinnerIds: string[] | null;
   /** Rempli uniquement en game_over : récap complet des rôles, thèmes et musiques de la dernière manche. */

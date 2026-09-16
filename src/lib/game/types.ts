@@ -52,6 +52,7 @@ export interface ServerRoom {
   mrWhiteGuessPlayerId: string | null;
   mrWhiteGuessResult: { guess: string; correct: boolean } | null;
   lastRoundRoles: Record<string, Role>;
+  lastRoundTheme: { civilTheme: string; undercoverTheme: string } | null;
   matchWinnerIds: string[] | null;
   phaseDeadline: number | null;
   phaseTimer: NodeJS.Timeout | null;
@@ -83,6 +84,7 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     mrWhiteGuessPlayerId: null,
     mrWhiteGuessResult: null,
     lastRoundRoles: {},
+    lastRoundTheme: null,
     matchWinnerIds: null,
     phaseDeadline: null,
     phaseTimer: null,
