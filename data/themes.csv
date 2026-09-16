@@ -1,501 +1,101 @@
 ﻿id,theme_a,theme_b,difficulty,category,reversible
-1,Musique quand tu te sens invincible,Musique quand tu veux reprendre confiance en toi,3,Émotions,TRUE
-2,Musique pour pleurer après une mauvaise journée,Musique pour repenser aux bons moments de ton enfance,2,Émotions,TRUE
-3,Musique pour laisser sortir ta colère,Musique pour contenir ta colère sans exploser,2,Émotions,TRUE
-4,Musique quand tu es amoureux,Musique quand quelqu’un commence à te manquer,2,Émotions,TRUE
-5,Musique pour reconstruire ta vie après un échec,Musique pour claquer la porte et partir sans te retourner,2,Émotions,TRUE
-6,Musique pour savourer ta liberté retrouvée,Musique pour rêver de liberté quand tu te sens coincé,2,Émotions,TRUE
-7,Musique quand tu as gagné,Musique quand tu te sens capable de gagner,2,Émotions,TRUE
-8,Musique quand tu es seul mais bien,Musique quand la solitude commence à peser,2,Émotions,TRUE
-9,Musique pour sourire en repensant à tes erreurs de jeunesse,Musique pour regretter une occasion que tu as laissée passer,2,Émotions,TRUE
-10,Musique pour calmer une crise de panique,Musique pour laisser ton esprit partir dans un rêve,2,Émotions,TRUE
-11,Musique pour garder espoir quand rien ne s’arrange,Musique pour savourer le premier signe que tout s’arrange,3,Émotions,TRUE
-12,Musique quand tu as le cœur brisé,Musique quand tu veux oublier quelqu’un,2,Émotions,TRUE
-13,Musique quand personne ne comprend ta colère,Musique quand tu choisis de t’isoler pour retrouver le calme,2,Émotions,TRUE
-14,Musique quand tu es jaloux,Musique quand tu regrettes quelqu’un,2,Émotions,TRUE
-15,Musique pour savourer une réussite sans rien dire,Musique pour afficher ta réussite devant ceux qui doutaient de toi,2,Émotions,TRUE
-16,Musique quand tu as peur,Musique quand tu dois trouver du courage,1,Émotions,TRUE
-17,Musique quand tu ne sais plus quelle direction donner à ta vie,Musique pour te lancer dans une nouvelle vie malgré le doute,2,Émotions,TRUE
-18,Musique pour imaginer une vie de rêve,Musique pour embellir une journée tout à fait ordinaire,2,Émotions,TRUE
-19,Musique quand tu décides enfin de démissionner,Musique quand tu hésites à quitter un travail qui t’épuise,2,Émotions,TRUE
-20,Musique pour savourer une attente pleine de promesses,Musique pour supporter une attente qui te rend fou,2,Émotions,TRUE
-21,Musique pour te sentir puissant même quand tu es seul,Musique pour impressionner quelqu’un qui te plaît,2,Émotions,TRUE
-22,Musique pour savourer le calme après une tempête,Musique pour sentir qu’un danger approche dans le silence,1,Émotions,TRUE
-23,Musique quand tu caches ta tristesse derrière un sourire,Musique quand tu assumes enfin ta tristesse devant quelqu’un,2,Émotions,TRUE
-24,Musique pour pardonner à quelqu’un et reconstruire le lien,Musique pour partir sans rancune et ne plus revenir,3,Émotions,TRUE
-25,Musique pour garder vivant le souvenir d’une histoire d’amour,Musique pour effacer une ancienne histoire d’amour de ta tête,2,Émotions,TRUE
-26,Musique pour ralentir une journée qui t’épuise,Musique pour prolonger un moment de bonheur qui passe trop vite,2,Émotions,TRUE
-27,Musique pour te sentir jeune et prêt à tout,Musique pour retrouver la tendresse de ton enfance,1,Émotions,TRUE
-28,Musique pour préparer ta revanche contre un rival,Musique pour prouver à tes proches que tu peux réussir,3,Émotions,TRUE
-29,Musique pour dire « laissez-moi tranquille »,Musique pour dire « ne me laissez pas seul »,1,Émotions,TRUE
-30,Musique pour accepter une rupture que tu n’as pas choisie,Musique pour refuser de croire que ta rupture est définitive,2,Émotions,TRUE
-31,Musique pour un premier rendez-vous,Musique pour une soirée romantique après plusieurs années ensemble,3,Relations,TRUE
-32,Musique pour tomber amoureux sans l’avoir prévu,Musique pour résister à une attirance qui complique tout,2,Relations,TRUE
-33,Musique pour rêver à quelqu’un qui ne te connaît pas encore,Musique quand la personne qui te plaît te propose enfin un rendez-vous,2,Relations,TRUE
-34,Musique quand tu attends une réponse à ta déclaration,Musique quand on répond à ta déclaration « je préfère qu’on reste amis »,2,Relations,TRUE
-35,Musique quand tu veux récupérer ton ex,Musique quand tu veux définitivement oublier ton ex,1,Relations,TRUE
-36,Musique pour déclarer tes sentiments,Musique quand tu gardes tes sentiments pour toi,2,Relations,TRUE
-37,Musique pour une relation secrète,Musique pour une relation à distance,3,Relations,TRUE
-38,Musique quand quelqu’un te manque,Musique quand tu vas enfin revoir quelqu’un qui te manque,2,Relations,TRUE
-39,Musique après une dispute de couple,Musique après une réconciliation,1,Relations,TRUE
-40,Musique quand tu réalises que la relation est finie,Musique quand tu essaies encore de sauver la relation,3,Relations,TRUE
-41,Musique pour danser un slow les yeux dans les yeux,Musique pour flirter en dansant sur une piste bondée,1,Relations,TRUE
-42,Musique quand tu regardes les anciennes photos de ton couple,Musique quand tu supprimes les anciennes photos de ton couple,2,Relations,TRUE
-43,Musique pour un amour que vos familles refusent,Musique pour un amour qui n’est pas réciproque,2,Relations,TRUE
-44,Musique pour un coup de foudre avec un inconnu,Musique pour retrouver ton amour de jeunesse après des années,3,Relations,TRUE
-45,Musique quand tu apprends que la personne qui te plaît est célibataire,Musique quand tu apprends que la personne qui te plaît va bientôt déménager loin,2,Relations,TRUE
-46,Musique pour tenter de séduire sans trop en faire,Musique pour célébrer votre première nuit ensemble,2,Relations,TRUE
-47,Musique pour envoyer « tu me manques » à ton ex à 2 h du matin,Musique quand tu regrettes au réveil d’avoir écrit à ton ex pendant la nuit,3,Relations,TRUE
-48,Musique quand tu veux dire « reste »,Musique quand tu veux dire « pars »,1,Relations,TRUE
-49,Musique quand tu croises ton ex par hasard,Musique quand tu te prépares à revoir ton ex pour le reconquérir,2,Relations,TRUE
-50,Musique pour un amour d’été,Musique pour une histoire qui dure depuis des années,1,Relations,TRUE
-51,Musique pour célébrer un amour réciproque,Musique pour rêver d’un amour que tu n’as pas encore rencontré,3,Relations,TRUE
-52,Musique quand tu découvres une infidélité,Musique quand tu cherches des indices sans savoir si tu te trompes,3,Relations,TRUE
-53,Musique quand tu pardonnes quelqu’un,Musique quand tu décides de couper les ponts,1,Relations,TRUE
-54,Musique pour l’entrée des mariés devant leurs invités,Musique pour une demande en mariage en tête-à-tête,2,Relations,TRUE
-55,Musique pour un dîner très sage avec tes beaux-parents,Musique pour une escapade romantique loin de toute la famille,1,Relations,TRUE
-56,Musique pour demander pardon après avoir blessé ton partenaire,Musique quand ton partenaire te donne une seconde chance,3,Relations,TRUE
-57,Musique pour provoquer la jalousie de ton ex en soirée,Musique pour faire semblant de ne pas être jaloux en soirée,3,Relations,TRUE
-58,Musique pour une relation passionnelle,Musique pour une relation apaisante,1,Relations,TRUE
-59,Musique pour avouer ton amour à ton meilleur ami,Musique pour expliquer à ton meilleur ami amoureux de toi que tu préfères rester amis,2,Relations,TRUE
-60,Musique pour laisser un dernier message d’adieu,Musique pour laisser un message qui invite à se revoir,2,Relations,TRUE
-61,Musique pour commencer une soirée,Musique pour finir une soirée à 5 h du matin,1,Soirée & social,TRUE
-62,Musique pour une soirée entre amis à la maison,Musique pour une grosse soirée en boîte,1,Soirée & social,TRUE
-63,Musique pour un apéro tranquille,Musique pour le moment où le salon se transforme en piste de danse,2,Soirée & social,TRUE
-64,Musique pour entraîner toute la piste dans une danse collective,Musique pour faire ton solo au milieu d’un cercle d’amis,3,Soirée & social,TRUE
-65,Musique pour accueillir les invités avec élégance,Musique pour convaincre tes invités de rester pour un dernier verre,2,Soirée & social,TRUE
-66,Musique pour réveiller une piste de danse qui se vide,Musique pour calmer une piste de danse devenue trop agitée,2,Soirée & social,TRUE
-67,Musique pour une réception en tenue de soirée,Musique pour une fête improvisée dans un garage,1,Soirée & social,TRUE
-68,Musique pour souffler les bougies avec tes proches,Musique pour lever un trophée avec ton équipe,2,Soirée & social,TRUE
-69,Musique quand tout le monde chante ensemble,Musique quand tout le monde se met à danser,2,Soirée & social,TRUE
-70,Musique pour danser pieds nus autour d’un feu de plage,Musique pour danser sur une plage transformée en club,1,Soirée & social,TRUE
-71,Musique pour une fête sur le thème du disco,Musique pour une fête sur le thème du rock’n’roll,1,Soirée & social,TRUE
-72,Musique pour une soirée de retrouvailles avec ta bande du lycée,Musique pour briser la glace entre des invités qui ne se connaissent pas,2,Soirée & social,TRUE
-73,Musique pour imposer ton morceau préféré à toute la soirée,Musique pour passer un morceau qui fait plaisir à tout le monde,2,Soirée & social,TRUE
-74,Musique pour faire chanter une salle dès les premières secondes,Musique pour surprendre une salle avec un morceau inattendu mais dansant,2,Soirée & social,TRUE
-75,Musique pour lancer une danse en couple,Musique pour lancer une ronde avec tous tes amis,2,Soirée & social,TRUE
-76,Musique pour une soirée consacrée aux tubes de votre adolescence,Musique pour une soirée consacrée aux découvertes musicales récentes,1,Soirée & social,TRUE
-77,Musique pour une fête familiale,Musique pour une soirée uniquement entre potes,1,Soirée & social,TRUE
-78,Musique pour un dîner dans un bar à jazz,Musique pour une soirée dansante dans un club de jazz,2,Soirée & social,TRUE
-79,Musique pour un barbecue animé entre amis,Musique pour un dîner aux chandelles entre amis,2,Soirée & social,TRUE
-80,Musique pour un karaoké où l’on chante faux sans complexe,Musique pour un concours de chant où tu veux impressionner le jury,2,Soirée & social,TRUE
-81,Musique pour faire une entrée remarquée à une fête,Musique pour quitter une fête en gardant une allure mystérieuse,2,Soirée & social,TRUE
-82,Musique pour flirter au comptoir d’un bar,Musique pour refaire le monde au comptoir avec un vieil ami,2,Soirée & social,TRUE
-83,Musique quand la soirée devient incontrôlable,Musique quand la soirée retombe doucement,1,Soirée & social,TRUE
-84,Musique pour révéler une fête surprise quand la personne entre,Musique pour cacher les préparatifs d’une fête surprise juste avant l’arrivée de l’invité,2,Soirée & social,TRUE
-85,Musique quand l’ami que tu attendais arrive enfin à la fête,Musique pour profiter d’une fête malgré l’absence de ton meilleur ami,2,Soirée & social,TRUE
-86,Musique pour conduire seul la nuit,Musique pour conduire avec tes amis en plein jour,1,Voyage & route,TRUE
-87,Musique pour partir en vacances,Musique pour rentrer de vacances,1,Voyage & route,TRUE
-88,Musique pour avaler les kilomètres sur une autoroute déserte,Musique pour flâner en décapotable dans une station balnéaire,2,Voyage & route,TRUE
-89,Musique quand tu roules fenêtres ouvertes,Musique quand tu conduis sous la pluie,1,Voyage & route,TRUE
-90,Musique pour traverser une grande ville illuminée,Musique pour traverser une plaine déserte à la tombée du jour,2,Voyage & route,TRUE
-91,Musique pour quitter ta ville sans date de retour,Musique pour rentrer chez toi après des années à l’étranger,2,Voyage & route,TRUE
-92,Musique quand tout le monde dort dans la voiture sauf toi,Musique quand tout le monde chante dans la voiture,1,Voyage & route,TRUE
-93,Musique pour rouler à vitesse régulière sur l’autoroute,Musique pour enchaîner les virages d’une route de montagne,2,Voyage & route,TRUE
-94,Musique pour contempler le paysage à bord d’un train,Musique pour une scène de train lancé à toute vitesse dans un film,2,Voyage & route,TRUE
-95,Musique pour arriver dans un village de bord de mer,Musique pour arriver dans un refuge de haute montagne,2,Voyage & route,TRUE
-96,Musique pour voyager en stop avec un sac à dos,Musique pour traverser le pays dans un train de luxe,2,Voyage & route,TRUE
-97,Musique pour regarder la terre disparaître au décollage,Musique pour regarder la campagne défiler depuis un vieux train,2,Voyage & route,TRUE
-98,Musique pour attendre un vol de nuit dans un terminal presque vide,Musique pour l’instant où l’avion traverse les nuages,2,Voyage & route,TRUE
-99,Musique pour découvrir une ville où personne ne te connaît,Musique pour retrouver la ville où tu as grandi,2,Voyage & route,TRUE
-100,Musique pour marcher dans les rues de Paris sous la pluie,Musique pour marcher dans les rues de New York la nuit,2,Voyage & route,TRUE
-101,Musique pour une première nuit en auberge de jeunesse,Musique pour une première nuit dans un palace,2,Voyage & route,TRUE
-102,Musique quand tu pars très tôt le matin,Musique quand tu arrives très tard le soir,2,Voyage & route,TRUE
-103,Musique pour regarder le coucher du soleil depuis la voiture,Musique pour regarder les lumières de la ville depuis la voiture,3,Voyage & route,TRUE
-104,Musique pour une traversée en voilier au grand large,Musique pour une balade en barque sur une rivière,2,Voyage & route,TRUE
-105,Musique quand tu te perds mais que ça ne te dérange pas,Musique quand tu te perds et que tu commences à paniquer,2,Voyage & route,TRUE
-106,Musique pour quitter le port à bord d’un paquebot,Musique pour débarquer sur une île déserte,2,Voyage & route,TRUE
-107,Musique pour franchir une frontière vers un pays inconnu,Musique pour apercevoir ton village au bout de la route,2,Voyage & route,TRUE
-108,Musique pour une expédition dans le désert,Musique pour une exploration dans la jungle,1,Voyage & route,TRUE
-109,Musique pour flâner sur le sable d’une île tropicale,Musique pour flâner dans les ruelles d’une vieille ville italienne,2,Voyage & route,TRUE
-110,Musique pour contempler un océan sans terre à l’horizon,Musique pour flotter au-dessus d’une mer de nuages,3,Voyage & route,TRUE
-111,Musique pour ouvrir les fenêtres un matin d’été,Musique pour traîner dehors pendant une nuit d’été,2,Saisons & météo,TRUE
-112,Musique pour une journée de pluie,Musique pour une nuit d’orage,2,Saisons & météo,TRUE
-113,Musique pour la première baignade de l’été,Musique pour le dernier feu de camp de l’été,2,Saisons & météo,TRUE
-114,Musique pour regarder la neige tomber depuis un chalet,Musique pour faire une bataille de boules de neige,1,Saisons & météo,TRUE
-115,Musique pour les premières fleurs du printemps,Musique pour les dernières soirées de l’été,2,Saisons & météo,TRUE
-116,Musique pour un brunch tranquille le dimanche,Musique pour un apéro du vendredi après le travail,2,Saisons & météo,TRUE
-117,Musique pour affronter le lundi matin malgré la fatigue,Musique pour accompagner le petit blues du dimanche soir,2,Saisons & météo,TRUE
-118,Musique pour un lever de soleil,Musique pour un coucher de soleil,3,Saisons & météo,TRUE
-119,Musique pour une nuit d’été où la chaleur empêche de dormir,Musique pour une nuit d’hiver au chaud sous la couette,2,Saisons & météo,TRUE
-120,Musique pour regarder la pluie depuis ton canapé,Musique pour danser sous la pluie sans chercher d’abri,1,Saisons & météo,TRUE
-121,Musique pour accueillir une éclaircie après des jours de pluie,Musique pour profiter d’un ciel d’orage avant qu’il éclate,2,Saisons & météo,TRUE
-122,Musique pour une soirée d’hiver,Musique pour une soirée d’été,1,Saisons & météo,TRUE
-123,Musique pour voir les feuilles tomber en automne,Musique pour voir les arbres refleurir au printemps,2,Saisons & météo,TRUE
-124,Musique pour un après-midi au soleil,Musique pour une soirée sous les étoiles,2,Saisons & météo,TRUE
-125,Musique pour traverser une ville écrasée par la canicule,Musique pour traverser une ville figée par le gel,1,Saisons & météo,TRUE
-126,Musique pour un marché de Noël animé,Musique pour un paysage enneigé sans personne à l’horizon,1,Saisons & météo,TRUE
-127,Musique pour te réveiller doucement avant l’aube,Musique pour garder de l’énergie pendant une nuit de travail,2,Quotidien,TRUE
-128,Musique pour une sieste d’été,Musique pour une nuit d’insomnie,2,Saisons & météo,TRUE
-129,Musique pour le compte à rebours du Nouvel An,Musique pour un toast émouvant à ton anniversaire,2,Soirée & social,TRUE
-130,Musique pour ressortir danser aux premiers beaux jours,Musique pour rentrer se réchauffer quand l’hiver arrive,2,Saisons & météo,TRUE
-131,Musique pour un vent léger dans les arbres,Musique pour des rafales qui font claquer les volets,2,Saisons & météo,TRUE
-132,Musique pour glisser sur des vagues en surf,Musique pour glisser sur une piste de ski,2,Saisons & météo,TRUE
-133,Musique pour un pique-nique à l’ombre des arbres,Musique pour un goûter près de la cheminée,2,Saisons & météo,TRUE
-134,Musique pour un matin brumeux au bord d’un lac,Musique pour un après-midi de soleil au bord d’un lac,2,Saisons & météo,TRUE
-135,Musique pour les lumières d’une fête foraine en été,Musique pour les lumières de Noël dans une rue enneigée,1,Saisons & météo,TRUE
-136,Musique pour cuisiner en dansant dans ta cuisine,Musique pour savourer un repas sans te presser,1,Quotidien,TRUE
-137,Musique pour faire le ménage en chantant à tue-tête,Musique pour récupérer sur le canapé après le ménage,1,Quotidien,TRUE
-138,Musique pour prendre une longue douche,Musique pour se préparer rapidement,2,Quotidien,TRUE
-139,Musique pour déambuler dans un marché de quartier,Musique pour faire les courses juste avant la fermeture,2,Quotidien,TRUE
-140,Musique pour marcher sans destination,Musique pour marcher parce que tu es en retard,1,Quotidien,TRUE
-141,Musique pour trier une boîte de vieux souvenirs,Musique pour repeindre ta chambre dans une couleur éclatante,2,Quotidien,TRUE
-142,Musique pour préparer un petit-déjeuner au soleil,Musique pour cuisiner un dîner de séduction,2,Quotidien,TRUE
-143,Musique pour boire ton premier café,Musique pour prendre ton dernier verre de la journée,2,Quotidien,TRUE
-144,Musique pour transformer ton salon en spa,Musique pour transformer ton salon en salle de danse,1,Quotidien,TRUE
-145,Musique pour te sentir riche le jour de la paie,Musique pour te croire encore riche avec dix euros sur ton compte,2,Quotidien,TRUE
-146,Musique pour aller faire des achats,Musique quand tu regrettes tes achats,2,Quotidien,TRUE
-147,Musique pour choisir une tenue comme si tu défilais,Musique pour t’habiller en deux minutes avant de partir,2,Quotidien,TRUE
-148,Musique pour attendre un ami dans un café,Musique pour accueillir un ami après des mois sans le voir,2,Quotidien,TRUE
-149,Musique pour retrouver une lettre que tu croyais perdue,Musique pour chercher une lettre précieuse dans toute la maison,2,Quotidien,TRUE
-150,Musique pour monter un meuble comme un grand architecte,Musique pour contempler ton meuble qui penche dangereusement,2,Humour,TRUE
-151,Musique pour cuisiner un repas comme dans une finale de concours,Musique pour servir une pizza livrée comme un grand chef,2,Humour,TRUE
-152,Musique pour promener un chien qui tire sur sa laisse,Musique pour caresser un chat endormi sur tes genoux,1,Quotidien,TRUE
-153,Musique pour te plonger dans un roman policier,Musique pour feuilleter un magazine sans vraiment lire,2,Quotidien,TRUE
-154,Musique pour faire une pause,Musique pour se remettre au travail,2,Quotidien,TRUE
-155,Musique pour ouvrir un colis que tu attends depuis des mois,Musique pour emballer un objet précieux que tu dois renvoyer,2,Quotidien,TRUE
-156,Musique pour te garer comme une star devant l’entrée,Musique pour manœuvrer dans une place beaucoup trop étroite,2,Humour,TRUE
-157,Musique pour patienter chez le coiffeur,Musique pour découvrir ta nouvelle coupe dans le miroir,2,Quotidien,TRUE
-158,Musique pour aller travailler dans un métro bondé,Musique pour rentrer dans le dernier métro presque vide,2,Quotidien,TRUE
-159,Musique pour profiter de la maison vide pendant une heure,Musique pour un dimanche où toute la famille cuisine ensemble,2,Quotidien,TRUE
-160,Musique pour préparer ton premier appartement avant la crémaillère,Musique pour passer ta première soirée seul dans ton nouvel appartement,2,Quotidien,TRUE
-161,Musique pour chercher ton téléphone comme un détective,Musique pour découvrir que le téléphone que tu cherchais était dans ta main,2,Humour,TRUE
-162,Musique pour négocier avec une imprimante récalcitrante,Musique pour célébrer l’unique page qu’une imprimante en panne accepte d’imprimer,2,Humour,TRUE
-163,Musique pour ouvrir un cadeau avec curiosité,Musique pour fabriquer un cadeau à la main avec tendresse,2,Quotidien,TRUE
-164,Musique quand tu retrouves un vieux vêtement que tu adores,Musique quand tu dois jeter un vêtement que tu adores,3,Quotidien,TRUE
-165,Musique pour rester au lit le matin,Musique pour réussir à sortir du lit,1,Quotidien,TRUE
-166,Musique pour commencer une séance de sport en douceur,Musique pour tenir les dernières répétitions quand les muscles brûlent,2,Sport & motivation,TRUE
-167,Musique pour courir tranquillement,Musique pour sprinter à fond,1,Sport & motivation,TRUE
-168,Musique avant une compétition,Musique après avoir gagné une compétition,2,Sport & motivation,TRUE
-169,Musique après une défaite,Musique avant de prendre ta revanche,2,Sport & motivation,TRUE
-170,Musique pour soulever lourd,Musique pour faire une longue séance cardio,1,Sport & motivation,TRUE
-171,Musique pour une séance de boxe sur un sac,Musique pour une séance de danse cardio en groupe,1,Sport & motivation,TRUE
-172,Musique pour te motiver à faire du sport malgré la fatigue,Musique pour accompagner une séance où tu te sens inarrêtable,2,Sport & motivation,TRUE
-173,Musique pour un tour d’honneur devant les supporters,Musique pour une remise de médaille officielle,2,Sport & motivation,TRUE
-174,Musique pour trouver ton équilibre sur une poutre,Musique pour prendre ton élan avant un saut en longueur,1,Sport & motivation,TRUE
-175,Musique pour battre ton record,Musique pour reprendre après une longue pause,3,Sport & motivation,TRUE
-176,Musique pour courir en forêt loin de la ville,Musique pour courir dans une rue éclairée au néon,2,Sport & motivation,TRUE
-177,Musique pour encourager ton équipe qui doit égaliser,Musique pour encourager ton équipe à conserver son avance,2,Sport & motivation,TRUE
-178,Musique pour une démonstration de gymnastique élégante,Musique pour une démonstration de skateboard dans la rue,1,Sport & motivation,TRUE
-179,Musique pour marcher longtemps sur un sentier de randonnée,Musique pour gravir la dernière pente avant le sommet,2,Sport & motivation,TRUE
-180,Musique pour récupérer après l’effort,Musique pour trouver l’énergie de recommencer,2,Sport & motivation,TRUE
-181,Musique pour entrer sur un ring de boxe,Musique pour quitter le ring après un combat épuisant,2,Sport & motivation,TRUE
-182,Musique pour disputer une finale devant un stade plein,Musique pour jouer un match amical dans ton quartier,2,Sport & motivation,TRUE
-183,Musique quand tu es favori,Musique quand personne ne croit en toi,3,Sport & motivation,TRUE
-184,Musique quand tu domines complètement,Musique quand tu refuses d’abandonner,3,Sport & motivation,TRUE
-185,Musique pour ramer tous ensemble dans un bateau,Musique pour naviguer seul en planche à voile,2,Sport & motivation,TRUE
-186,Musique pour pédaler au milieu du rythme de la ville,Musique pour pédaler tranquillement sur un chemin de campagne,2,Sport & motivation,TRUE
-187,Musique pour une chorégraphie de natation synchronisée,Musique pour une course d’aviron,2,Sport & motivation,TRUE
-188,Musique pour un cours de yoga dynamique,Musique pour des étirements profonds après le sport,3,Sport & motivation,TRUE
-189,Musique pour intimider ton adversaire avant un duel,Musique pour te rassurer toi-même avant un duel,3,Sport & motivation,TRUE
-190,Musique pour une figure de patinage artistique,Musique pour une descente en patinage de vitesse,2,Sport & motivation,TRUE
-191,Musique pour organiser calmement ta journée de travail,Musique pour finir un dossier dix minutes avant l’échéance,2,Travail & études,TRUE
-192,Musique pour réviser méthodiquement un mois avant l’examen,Musique pour réviser dans la panique la veille de l’examen,1,Travail & études,TRUE
-193,Musique avant un entretien,Musique après un entretien qui s’est bien passé,2,Travail & études,TRUE
-194,Musique pour chercher la solution d’une énigme compliquée,Musique pour savourer le moment où tu résous une énigme compliquée,2,Travail & études,TRUE
-195,Musique pour dessiner seul dans ton carnet,Musique pour présenter tes créations lors d’un vernissage,2,Travail & études,TRUE
-196,Musique pour rêvasser en regardant la pluie au bureau,Musique pour reprendre discrètement un dossier quand le chef arrive,2,Travail & études,TRUE
-197,Musique pour ouvrir le bureau un lundi matin,Musique pour fermer le bureau avant les grandes vacances,2,Travail & études,TRUE
-198,Musique pour envoyer enfin le projet sur lequel tu travailles depuis des mois,Musique pour reprendre un projet de longue haleine après un refus,2,Travail & études,TRUE
-199,Musique pour préparer une présentation avec concentration,Musique pour faire une entrée assurée devant le public,2,Travail & études,TRUE
-200,Musique pour ouvrir le sujet d’un examen difficile,Musique pour poser enfin ton stylo après la dernière question d’un examen,2,Travail & études,TRUE
-201,Musique pour une bibliothèque silencieuse,Musique pour travailler dans un café animé,2,Travail & études,TRUE
-202,Musique pour écrire une lettre d’amour,Musique pour écrire un discours de protestation,2,Travail & études,TRUE
-203,Musique pour avancer sans interruption sur ton travail,Musique pour remettre ton travail à plus tard sans culpabiliser,2,Travail & études,TRUE
-204,Musique pour célébrer une bonne note obtenue à force de travail,Musique pour rire d’une mauvaise note que tu avais vue venir,2,Travail & études,TRUE
-205,Musique pour commencer le métier dont tu rêvais,Musique pour quitter un métier qui ne te correspond plus,2,Travail & études,TRUE
-206,Musique pour travailler dans un atelier d’artiste en désordre,Musique pour travailler dans un laboratoire impeccable,2,Travail & études,TRUE
-207,Musique pour entrer dans une réunion comme si tu dirigeais l’entreprise,Musique pour hocher la tête en réunion sans comprendre un mot,2,Humour,TRUE
-208,Musique pour apprendre tes premiers pas de danse,Musique pour répéter une chorégraphie que tu maîtrises parfaitement,2,Travail & études,TRUE
-209,Musique pour fermer ton ordinateur après une journée intense,Musique pour préparer ton sac avant une journée décisive,2,Travail & études,TRUE
-210,Musique pour inventer une idée qui te passionne,Musique pour classer une pile de dossiers sans réfléchir,2,Travail & études,TRUE
-211,Musique pour attendre les résultats d’un concours,Musique pour défiler lors de la remise des diplômes,2,Travail & études,TRUE
-212,Musique pour travailler toute la nuit,Musique quand tu décides finalement d’aller dormir,1,Travail & études,TRUE
-213,Musique pour convaincre un jury de croire en ton idée,Musique pour remercier ceux qui ont cru en ton idée,2,Travail & études,TRUE
-214,Musique pour ton premier jour dans une nouvelle école,Musique pour dire au revoir à ta classe en fin d’année,2,Travail & études,TRUE
-215,Musique pour un travail minutieux d’horloger,Musique pour une équipe de chantier qui bâtit un immeuble,1,Travail & études,TRUE
-216,Musique pour l’entrée du héros,Musique pour l’entrée du méchant,1,Cinéma & imaginaire,TRUE
-217,Musique pour une scène de victoire,Musique pour une scène de revanche,2,Cinéma & imaginaire,TRUE
-218,Musique pour le générique d’ouverture d’un film d’aventure,Musique pour le générique de fin d’un film d’aventure,2,Cinéma & imaginaire,TRUE
-219,Musique pour une poursuite en voiture sur une autoroute,Musique pour une fuite à pied dans des ruelles étroites,3,Cinéma & imaginaire,TRUE
-220,Musique pour découvrir un monde fantastique,Musique pour quitter un monde fantastique,2,Cinéma & imaginaire,TRUE
-221,Musique pour un combat final entre deux rivaux,Musique pour les regards silencieux de deux rivaux juste avant leur combat,2,Cinéma & imaginaire,TRUE
-222,Musique pour une scène d’action au ralenti,Musique pour un montage d’entraînement très rapide,1,Cinéma & imaginaire,TRUE
-223,Musique pour un super-héros qui sauve la ville,Musique pour un hors-la-loi qui sauve la ville à sa manière,2,Cinéma & imaginaire,TRUE
-224,Musique pour un personnage qui accède au pouvoir,Musique pour un personnage qui s’accroche au pouvoir qu’il perd,2,Cinéma & imaginaire,TRUE
-225,Musique pour un royaume magnifique,Musique pour un royaume en ruines,1,Cinéma & imaginaire,TRUE
-226,Musique pour dériver entre les étoiles,Musique pour descendre dans les profondeurs de l’océan,3,Cinéma & imaginaire,TRUE
-227,Musique pour une découverte incroyable,Musique pour une révélation inquiétante,2,Cinéma & imaginaire,TRUE
-228,Musique pour un premier baiser au cinéma,Musique pour un dernier baiser avant une séparation au cinéma,2,Cinéma & imaginaire,TRUE
-229,Musique pour un générique d’anime plein d’énergie,Musique pour une scène de sacrifice héroïque dans un anime,2,Cinéma & imaginaire,TRUE
-230,Musique pour un héros qui découvre ses pouvoirs avec émerveillement,Musique pour un héros qui perd le contrôle de ses pouvoirs,2,Cinéma & imaginaire,TRUE
-231,Musique pour explorer une ville futuriste,Musique pour explorer une ville abandonnée,1,Cinéma & imaginaire,TRUE
-232,Musique pour une mission secrète,Musique pour une mission de sauvetage,2,Cinéma & imaginaire,TRUE
-233,Musique pour un braquage parfaitement préparé,Musique pour un braquage qui tourne mal,1,Cinéma & imaginaire,TRUE
-234,Musique pour chercher la source d’un bruit dans une maison vide,Musique pour fuir une créature qui vient d’apparaître dans une maison vide,1,Cinéma & imaginaire,TRUE
-235,Musique pour un inconnu fascinant dont on ignore les intentions,Musique pour un criminel élégant qui inspire la peur,3,Cinéma & imaginaire,TRUE
-236,Musique pour un duel entre rivaux,Musique pour un combat entre anciens amis,3,Cinéma & imaginaire,TRUE
-237,Musique pour une armée qui avance vers la bataille,Musique pour une armée qui protège sa retraite,2,Cinéma & imaginaire,TRUE
-238,Musique pour une victoire obtenue au prix d’un sacrifice,Musique pour une défaite où le héros garde son honneur,2,Cinéma & imaginaire,TRUE
-239,Musique pour découvrir une ville du futur,Musique pour découvrir une ville telle qu’elle était cent ans plus tôt,2,Cinéma & imaginaire,TRUE
-240,Musique pour un rêve merveilleux qui paraît réel,Musique pour un rêve étrange dont tu cherches à sortir,2,Cinéma & imaginaire,TRUE
-241,Musique pour une apocalypse,Musique pour reconstruire le monde après l’apocalypse,2,Cinéma & imaginaire,TRUE
-242,Musique pour un détective qui reconstitue le crime,Musique pour un suspect qui invente son alibi,2,Cinéma & imaginaire,TRUE
-243,Musique pour une course contre la montre,Musique pour attendre quelque chose d’inévitable,2,Cinéma & imaginaire,TRUE
-244,Musique pour ouvrir un coffre contenant un secret de famille,Musique pour cacher un secret de famille avant l’arrivée des autres,3,Cinéma & imaginaire,TRUE
-245,Musique pour un justicier solitaire qui veille sur la ville,Musique pour une équipe de justiciers réunie pour la première fois,2,Cinéma & imaginaire,TRUE
-246,Musique pour un toit-terrasse au-dessus de la ville la nuit,Musique pour une terrasse face à la mer au coucher du soleil,3,Lieux & ambiances,TRUE
-247,Musique pour une plage déserte au petit matin,Musique pour une plage animée à l’heure des vacances,1,Lieux & ambiances,TRUE
-248,Musique pour les avenues d’une métropole la nuit,Musique pour les ruelles d’un village endormi,1,Lieux & ambiances,TRUE
-249,Musique pour un café tranquille,Musique pour un bar animé,1,Lieux & ambiances,TRUE
-250,Musique pour une forêt dense où la lumière passe à peine,Musique pour un sommet de montagne avec une vue immense,1,Lieux & ambiances,TRUE
-251,Musique pour une crique abritée où l’eau bouge à peine,Musique pour une falaise battue par les vagues,2,Lieux & ambiances,TRUE
-252,Musique pour un hôtel de luxe,Musique pour une petite maison de vacances,2,Lieux & ambiances,TRUE
-253,Musique pour une fête sur le pont d’un bateau de pirates,Musique pour un bal dans la salle d’un château,1,Lieux & ambiances,TRUE
-254,Musique pour les reflets de pluie sur une avenue la nuit,Musique pour une rue rendue silencieuse par la neige,3,Lieux & ambiances,TRUE
-255,Musique pour une oasis au milieu du désert,Musique pour une cabane sur une île tropicale,2,Lieux & ambiances,TRUE
-256,Musique pour un bal dans un château ancien,Musique pour une réception dans une villa futuriste,2,Lieux & ambiances,TRUE
-257,Musique pour un bar au pied des pistes après le ski,Musique pour un bar de plage après le surf,2,Lieux & ambiances,TRUE
-258,Musique pour traverser un quartier désert après minuit,Musique pour traverser un quartier pendant un carnaval,1,Lieux & ambiances,TRUE
-259,Musique pour passer une nuit seul dans une chambre d’hôtel,Musique pour retrouver ton lit après un long déplacement,2,Lieux & ambiances,TRUE
-260,Musique pour une grande gare,Musique pour un petit arrêt de campagne,2,Lieux & ambiances,TRUE
-261,Musique pour un parc plein de pique-niques en été,Musique pour un parc couvert de feuilles mortes en automne,2,Lieux & ambiances,TRUE
-262,Musique pour une salle de concert déserte après le spectacle,Musique pour la foule qui attend l’ouverture du rideau,2,Lieux & ambiances,TRUE
-263,Musique pour l’entrée d’un défilé de mode,Musique pour l’entrée d’un spectacle de cabaret,1,Lieux & ambiances,TRUE
-264,Musique pour un marché couvert plein de vie,Musique pour une galerie marchande presque vide le soir,2,Lieux & ambiances,TRUE
-265,Musique pour un restaurant chic,Musique pour un fast-food à minuit,2,Lieux & ambiances,TRUE
-266,Musique pour une station-service isolée sur une route américaine,Musique pour une aire de repos animée sur la route des vacances,2,Lieux & ambiances,TRUE
-267,Musique pour une cabane isolée,Musique pour un appartement en plein centre-ville,2,Lieux & ambiances,TRUE
-268,Musique pour visiter une exposition d’art contemporain,Musique pour assister à une performance d’art contemporain,2,Lieux & ambiances,TRUE
-269,Musique pour une projection de cinéma en plein air,Musique pour une projection dans une vieille salle de quartier,2,Lieux & ambiances,TRUE
-270,Musique pour flotter seul dans une piscine au lever du jour,Musique pour jouer dans l’eau avec tes amis l’après-midi,1,Lieux & ambiances,TRUE
-271,Musique qui te ramène à l’enfance,Musique qui te rappelle ton adolescence,2,Nostalgie,TRUE
-272,Musique pour revoir des images de tes bêtises d’enfance,Musique pour revoir des images de ton premier grand amour,2,Nostalgie,TRUE
-273,Musique qui sonne années 80,Musique qui sonne années 2000,2,Nostalgie,TRUE
-274,Musique pour un film avec une voiture de collection,Musique pour un film avec une voiture venue du futur,1,Nostalgie,TRUE
-275,Musique pour faire danser trois générations d’une famille,Musique pour faire danser uniquement une bande d’adolescents,2,Nostalgie,TRUE
-276,Musique pour un bal populaire des années 1960,Musique pour une discothèque des années 1980,1,Nostalgie,TRUE
-277,Musique pour une fête d’école primaire,Musique pour un bal de fin de lycée,1,Nostalgie,TRUE
-278,Musique pour une boum dans une chambre d’adolescent,Musique pour une soirée étudiante dans un appartement trop petit,1,Nostalgie,TRUE
-279,Musique pour revoir les souvenirs de tes premières vacances en solo,Musique pour imaginer le voyage que tu n’as jamais osé faire,2,Nostalgie,TRUE
-280,Musique pour réécouter un tube oublié des cours de récréation,Musique pour réécouter une chanson transmise par tes grands-parents,2,Nostalgie,TRUE
-281,Musique pour imaginer une soirée dans les années 1920,Musique pour imaginer une soirée dans les années 1970,1,Nostalgie,TRUE
-282,Musique pour rouvrir une boîte à souvenirs poussiéreuse,Musique pour enterrer une capsule destinée à ton futur toi,2,Nostalgie,TRUE
-283,Musique pour un vieux film de science-fiction qui imaginait notre époque,Musique pour un film de science-fiction qui imagine le siècle prochain,2,Nostalgie,TRUE
-284,Musique pour visiter l’école de ton enfance aujourd’hui vide,Musique pour retrouver ta cour de récréation dans un rêve,2,Nostalgie,TRUE
-285,Musique pour fêter les retrouvailles de ta classe vingt ans après,Musique pour regarder seul la photo de ton ancienne classe,2,Nostalgie,TRUE
-286,Musique pour un morceau qui sonne ancien malgré une production moderne,Musique pour un morceau ancien qui semble en avance sur son temps,2,Culture musicale,TRUE
-287,Musique pour une fête de village à l’ancienne,Musique pour un festival rétro organisé aujourd’hui,2,Nostalgie,TRUE
-288,Musique pour une publicité télévisée des années 1980,Musique pour une publicité contemporaine qui veut paraître futuriste,1,Nostalgie,TRUE
-289,Musique pour un souvenir d’été qui te revient avec précision,Musique pour un souvenir d’été qui se mélange à un rêve,3,Nostalgie,TRUE
-290,Musique pour retrouver un lieu aimé après dix ans,Musique pour quitter un lieu aimé qui va être démoli,2,Nostalgie,TRUE
-291,Musique pour chanter à tue-tête avec le refrain,Musique pour écouter chaque détail au casque les yeux fermés,2,Culture musicale,TRUE
-292,Musique pour donner envie d’apprendre la guitare,Musique pour donner envie d’apprendre le piano,1,Culture musicale,TRUE
-293,Musique pour une chanson que l’on retient grâce à son refrain,Musique pour une chanson que l’on retient grâce à son riff instrumental,2,Culture musicale,TRUE
-294,Musique pour un concert géant,Musique pour un concert intimiste,1,Culture musicale,TRUE
-295,Musique pour ouvrir un album comme une promesse,Musique pour fermer un album comme un adieu,3,Culture musicale,TRUE
-296,Musique pour faire vibrer les basses d’une enceinte,Musique pour mettre en valeur une voix presque nue,1,Culture musicale,TRUE
-297,Musique pour taper des mains en rythme,Musique pour claquer des doigts en rythme,2,Culture musicale,TRUE
-298,Musique pour une écoute au coin du feu sur un vieux tourne-disque,Musique pour une écoute nocturne dans une voiture futuriste,1,Culture musicale,TRUE
-299,Musique pour danser sur une reprise transformée en morceau de club,Musique pour écouter une reprise transformée en ballade acoustique,1,Culture musicale,TRUE
-300,Musique pour remplir une salle avec un refrain puissant,Musique pour captiver une salle avec une voix murmurée,1,Culture musicale,TRUE
-301,Musique pour un rappel où le public connaît chaque parole,Musique pour une première partie qui doit conquérir le public,2,Culture musicale,TRUE
-302,Musique pour une chanson qui raconte une histoire,Musique pour une chanson qui répète une phrase comme une obsession,2,Culture musicale,TRUE
-303,Musique pour une voix douce sur une musique agitée,Musique pour une voix intense sur une musique calme,2,Culture musicale,TRUE
-304,Musique pour montrer tes goûts musicaux,Musique que tu écoutes mais que tu n’assumes pas complètement,3,Culture musicale,TRUE
-305,Musique pour une chanson joyeuse avec des paroles tristes,Musique pour une chanson triste avec des paroles pleines d’espoir,3,Culture musicale,TRUE
-306,Musique pour faire découvrir tes goûts à un nouvel ami,Musique pour faire une déclaration d’amour avec une chanson,2,Culture musicale,TRUE
-307,Musique dont les paroles comptent beaucoup,Musique où l’ambiance compte plus que les paroles,2,Culture musicale,TRUE
-308,Musique pour une chanson à reprendre autour d’un feu avec une guitare,Musique pour une chanson à reprendre avec une chorale,1,Culture musicale,TRUE
-309,Musique pour un morceau qui accroche dès la première seconde,Musique pour un morceau qui construit lentement sa tension,3,Culture musicale,TRUE
-310,Musique pour un concert qui mise sur l’énergie brute,Musique pour un disque qui mise sur les détails de production,3,Culture musicale,TRUE
-311,Musique pour annoncer « je maîtrise » devant un problème,Musique pour improviser en panique devant un problème imprévu,2,Humour,TRUE
-312,Musique pour suivre un ami qui se prend pour un guide d’expédition,Musique pour rebrousser chemin quand ton ami guide d’expédition se perd,2,Humour,TRUE
-313,Musique pour traverser un hôtel comme si tu en étais propriétaire,Musique pour chercher discrètement la sortie après t’être trompé d’hôtel,2,Humour,TRUE
-314,Musique pour présenter une invention révolutionnaire,Musique pour voir ton invention commencer à fumer,2,Humour,TRUE
-315,Musique pour jouer les agents secrets en allant acheter du pain,Musique pour jouer les stars de cinéma en allant acheter du pain,2,Humour,TRUE
-316,Musique quand tu entres comme si tu étais le personnage principal,Musique quand tu trébuches juste après ton entrée,1,Humour,TRUE
-317,Musique pour faire une petite sieste « de cinq minutes »,Musique pour te réveiller d’une courte sieste à la nuit tombée,2,Humour,TRUE
-318,Musique pour danser seul en croyant les rideaux fermés,Musique pour continuer à danser après avoir aperçu les voisins,2,Humour,TRUE
-319,Musique pour dérouler ton plan comme un grand stratège,Musique pour improviser un nouveau plan avec trois bouts de ficelle,2,Humour,TRUE
-320,Musique pour montrer un tour de magie très solennel,Musique pour détourner l’attention après avoir raté ton tour,2,Humour,TRUE
-321,Musique pour raconter une anecdote comme une épopée,Musique pour reconnaître que ton récit épique était juste un trajet en bus,2,Humour,TRUE
-322,Musique pour te prendre pour un espion au laser game,Musique pour te prendre pour un général au paintball,2,Humour,TRUE
-323,Musique pour annoncer un régime avec une détermination héroïque,Musique pour négocier avec toi-même devant une part de gâteau,2,Humour,TRUE
-324,Musique pour traverser un parquet qui grince sur la pointe des pieds,Musique pour prétendre que le parquet qui grince fait partie de ta chorégraphie,1,Humour,TRUE
-325,Musique pour arriver à l’heure avec une allure impeccable,Musique pour arriver en retard comme si tu étais attendu sur un tapis rouge,2,Humour,TRUE
-326,Musique pour préparer une farce en cachette,Musique pour prendre la fuite quand la victime de ta farce comprend,2,Humour,TRUE
-327,Musique pour résister au dernier biscuit sur la table,Musique pour voler le dernier biscuit sur la table quand personne ne regarde,2,Humour,TRUE
-328,Musique pour sauver la soirée avec ton idée géniale,Musique pour demander de l’aide quand ton idée met la soirée en danger,2,Humour,TRUE
-329,Musique pour gagner un débat imaginaire sous la douche,Musique pour défendre ton opinion avec assurance dans un vrai débat,2,Humour,TRUE
-330,Musique pour résoudre un mot croisé comme une enquête criminelle,Musique pour annoncer la solution d’un mot croisé comme une découverte scientifique,2,Humour,TRUE
-331,Musique pour franchir la porte automatique comme un roi,Musique pour attendre dignement devant la porte qui ne s’ouvre pas,2,Humour,TRUE
-332,Musique pour explorer le frigo comme un chercheur de trésor,Musique pour organiser un festin avec les trois derniers ingrédients du frigo,2,Humour,TRUE
-333,Musique pour programmer ton réveil comme un futur champion,Musique pour négocier cinq minutes de plus avec ton réveil,2,Humour,TRUE
-334,Musique pour payer l’addition comme un millionnaire,Musique pour partager l’addition au centime près comme un comptable,2,Humour,TRUE
-335,Musique pour entrer dans une boutique « juste pour regarder »,Musique pour en ressortir chargé de sacs comme une star,2,Humour,TRUE
-336,Musique pour choisir un film comme une décision d’État,Musique pour t’endormir au bout de cinq minutes d’un film choisi avec soin,2,Humour,TRUE
-337,Musique pour dresser une assiette comme dans un restaurant étoilé,Musique pour présenter un plat brûlé avec l’assurance d’un grand chef,2,Humour,TRUE
-338,Musique pour réparer une fuite comme un héros de film d’action,Musique pour attendre le plombier devant une bassine qui se remplit,2,Humour,TRUE
-339,Musique pour chanter le refrain comme une vedette,Musique pour inventer les paroles du couplet sans perdre ton assurance,2,Humour,TRUE
-340,Musique pour jouer un solo imaginaire avec un balai,Musique pour diriger un orchestre imaginaire avec une cuillère,1,Humour,TRUE
-341,Musique pour gagner seul contre les derniers adversaires d’un jeu vidéo,Musique pour échapper aux adversaires d’un jeu vidéo avec presque plus de vie,2,Gaming,TRUE
-342,Musique pour mener ton équipe à la victoire presque à toi seul dans un jeu vidéo,Musique pour tenter de suivre ton équipe dans un jeu vidéo alors que tu débutes,2,Gaming,TRUE
-343,Musique pour lancer ta première partie de jeu vidéo avec une confiance totale,Musique pour lancer une revanche dans un jeu vidéo après cinq défaites,2,Gaming,TRUE
-344,Musique pour voir l’ennemi principal d’un jeu vidéo devenir encore plus puissant,Musique pour préparer ton équipement avant d’affronter l’ennemi principal d’un jeu vidéo,2,Gaming,TRUE
-345,Musique pour découvrir un trésor rare dans un jeu,Musique pour voler un trésor dans un jeu sous le nez d’un autre joueur,2,Gaming,TRUE
-346,Musique pour explorer un village accueillant dans un jeu vidéo,Musique pour explorer un village abandonné dans un jeu vidéo,2,Gaming,TRUE
-347,Musique pour construire ta maison idéale dans un jeu vidéo,Musique pour protéger ta maison contre une attaque dans un jeu vidéo,2,Gaming,TRUE
-348,Musique pour créer un personnage de guerrier majestueux dans un jeu,Musique pour créer un personnage de voleur discret dans un jeu,1,Gaming,TRUE
-349,Musique pour une course de jeu vidéo sur un circuit réaliste,Musique pour une course de jeu vidéo remplie de pièges farfelus,1,Gaming,TRUE
-350,Musique pour battre enfin l’ennemi principal d’un jeu vidéo après des dizaines d’essais,Musique pour continuer un combat de jeu vidéo avec un seul point de vie,2,Gaming,TRUE
-351,Musique pour bluffer à une table de poker,Musique pour révéler la main qui remporte la partie,2,Jeux & défis,TRUE
-352,Musique pour calculer ton prochain coup aux échecs,Musique pour jouer contre la montre aux échecs,2,Jeux & défis,TRUE
-353,Musique pour chercher des indices dans un jeu d’évasion,Musique pour ouvrir la dernière porte d’un jeu d’évasion juste avant la fin du temps,2,Jeux & défis,TRUE
-354,Musique pour un duel de danse amical,Musique pour un duel de danse où la rivalité est sérieuse,2,Jeux & défis,TRUE
-355,Musique pour faire tenir la dernière pièce d’une tour en bois,Musique pour observer une tour en bois vaciller après que tu as retiré une pièce,2,Jeux & défis,TRUE
-356,Musique pour un repas de famille,Musique pour un repas en tête-à-tête,1,Famille & souvenirs,TRUE
-357,Musique pour une berceuse chantée par un parent,Musique pour une chanson que toute la famille reprend en voiture,1,Famille & souvenirs,TRUE
-358,Musique pour accueillir un nouveau-né à la maison,Musique pour les premiers pas d’un enfant,2,Famille & souvenirs,TRUE
-359,Musique pour accueillir toute la famille pour les vacances,Musique pour la maison redevenue calme après le départ de la famille,2,Famille & souvenirs,TRUE
-360,Musique pour regarder les portraits de famille d’autrefois,Musique pour photographier les enfants qui jouent aujourd’hui,2,Famille & souvenirs,TRUE
-361,Musique pour retourner dans ta maison d’enfance,Musique pour emménager dans ta propre maison,2,Famille & souvenirs,TRUE
-362,Musique pour apprendre à ton enfant à faire du vélo,Musique pour regarder ton enfant partir seul à vélo pour la première fois,2,Famille & souvenirs,TRUE
-363,Musique pour un goûter d’anniversaire avec des enfants,Musique pour une fête d’anniversaire où les adultes retombent en enfance,1,Famille & souvenirs,TRUE
-364,Musique pour annoncer une bonne nouvelle à ta famille,Musique pour garder une bonne nouvelle secrète jusqu’au repas de famille,2,Famille & souvenirs,TRUE
-365,Musique pour un repas de famille où l’on raconte des souvenirs,Musique pour un repas de famille où un vieux conflit refait surface,2,Famille & souvenirs,TRUE
-366,Musique qui rappelle les vacances en famille,Musique qui rappelle les premières vacances entre amis,2,Famille & souvenirs,TRUE
-367,Musique pour apprendre une recette avec ta grand-mère,Musique pour refaire une recette de ta grand-mère des années plus tard en pensant à elle,3,Famille & souvenirs,TRUE
-368,Musique pour regarder un enfant ouvrir ses cadeaux,Musique pour voir un adulte retrouver son jouet d’enfance,1,Famille & souvenirs,TRUE
-369,Musique pour un parent qui veille près d’un enfant endormi,Musique pour un enfant qui rêve d’aventures pendant son sommeil,2,Famille & souvenirs,TRUE
-370,Musique pour revoir un proche après des années,Musique pour rendre hommage à un proche disparu,2,Famille & souvenirs,TRUE
-371,Musique pour le repas de Noël en famille,Musique pour le matin de Noël quand la maison dort encore,2,Famille & souvenirs,TRUE
-372,Musique pour préparer un album souvenir pour tes parents,Musique pour préparer une fête surprise pour tes parents,2,Famille & souvenirs,TRUE
-373,Musique pour un montage de souvenirs de plusieurs générations,Musique pour un montage des bêtises de ta bande d’amis,2,Famille & souvenirs,TRUE
-374,Musique pour entendre tes parents raconter leur jeunesse,Musique pour raconter ta première grande aventure à tes parents,2,Famille & souvenirs,TRUE
-375,Musique pour lire une histoire du soir à un enfant,Musique pour inventer une aventure avec un enfant dans le salon,1,Famille & souvenirs,TRUE
-376,Musique pour retrouver ton meilleur ami après une longue absence,Musique pour accompagner ton meilleur ami à la gare quand il part vivre loin,2,Amitié,TRUE
-377,Musique pour célébrer une amitié qui a traversé les années,Musique pour une nouvelle amitié qui donne envie de tout faire ensemble,2,Amitié,TRUE
-378,Musique pour consoler un ami qui a le cœur brisé,Musique pour entraîner dehors un ami au cœur brisé afin de lui changer les idées,2,Amitié,TRUE
-379,Musique pour une promesse de rester amis quoi qu’il arrive,Musique pour une amitié qui s’éloigne sans dispute,2,Amitié,TRUE
-380,Musique pour la première soirée où toute la bande est enfin réunie,Musique pour lever un verre à l’ami qui n’a pas pu venir,2,Amitié,TRUE
-381,Musique pour une soirée entre amis pleine de fous rires,Musique pour une nuit de confidences entre amis,1,Amitié,TRUE
-382,Musique pour célébrer la réussite de ton meilleur ami,Musique pour cacher ta jalousie devant la réussite de ton meilleur ami,2,Amitié,TRUE
-383,Musique pour un pacte secret entre deux amis,Musique pour une promesse d’amitié faite devant toute la bande,2,Amitié,TRUE
-384,Musique pour suivre le conseil raisonnable d’un ami,Musique pour partir ensemble dans une aventure déraisonnable,2,Amitié,TRUE
-385,Musique pour une embrouille entre amis,Musique pour une réconciliation entre amis,2,Amitié,TRUE
-386,Musique pour monter un projet fou avec ta bande,Musique pour convaincre ta bande de te suivre dans un projet fou,2,Amitié,TRUE
-387,Musique pour couvrir les bêtises d’un ami,Musique pour dire enfin ses quatre vérités à un ami,2,Amitié,TRUE
-388,Musique pour garder le lien avec un ami à l’autre bout du monde,Musique pour improviser une visite surprise chez un ami qui vit loin,2,Amitié,TRUE
-389,Musique pour accueillir un nouvel ami un peu timide,Musique pour célébrer l’ami qui met toujours l’ambiance,2,Amitié,TRUE
-390,Musique pour une nuit entière à discuter,Musique pour un silence confortable entre amis,3,Amitié,TRUE
-391,Musique pour défendre un ami contre une accusation injuste,Musique pour soutenir un ami qui reconnaît son erreur,2,Amitié,TRUE
-392,Musique pour se moquer gentiment d’un ami qui se prend pour une star,Musique pour rendre un hommage sincère à un ami devant la bande,2,Amitié,TRUE
-393,Musique pour confier à ton ami ce que personne d’autre ne sait,Musique pour révéler à ton ami une surprise que tu préparais en secret,2,Amitié,TRUE
-394,Musique pour un duo d’amis qui se lance dans une aventure,Musique pour une bande d’amis qui se lance dans une aventure,2,Amitié,TRUE
-395,Musique pour camper entre amis autour d’un feu,Musique pour monter une expédition entre amis avant l’aube,2,Amitié,TRUE
-396,Musique pour marcher seul dans une ville à 2 h du matin,Musique pour marcher en ville quand les commerces ouvrent,2,Jour & nuit,TRUE
-397,Musique pour observer la ville depuis un balcon à minuit,Musique pour traverser la ville en taxi à minuit,2,Jour & nuit,TRUE
-398,Musique pour le dernier slow avant la fermeture d’un bal,Musique pour la première danse d’un bal en plein air,2,Jour & nuit,TRUE
-399,Musique pour marcher en silence dans une maison endormie,Musique pour réveiller la maison en préparant une surprise,2,Jour & nuit,TRUE
-400,Musique pour regarder une pluie d’étoiles filantes,Musique pour observer une éclipse de soleil,2,Jour & nuit,TRUE
-401,Musique pour un bal qui se prolonge jusqu’au matin,Musique pour une nuit passée à refaire le monde sur un toit,2,Jour & nuit,TRUE
-402,Musique pour la dernière promenade avant de quitter une ville,Musique pour ta première promenade dans la ville où tu viens d’emménager,2,Jour & nuit,TRUE
-403,Musique pour un quartier de néons après minuit,Musique pour des rues baignées de soleil le matin,2,Jour & nuit,TRUE
-404,Musique pour ruminer une conversation à 2 h du matin,Musique pour trouver au réveil le courage de rappeler quelqu’un après une conversation difficile,2,Jour & nuit,TRUE
-405,Musique pour veiller au chevet de quelqu’un jusqu’au matin,Musique pour attendre un être aimé qui rentre tard,2,Jour & nuit,TRUE
-406,Musique pour une fête clandestine dans un entrepôt la nuit,Musique pour un défilé festif dans la rue en plein jour,1,Jour & nuit,TRUE
-407,Musique pour regarder le soleil se lever après une fête,Musique pour regarder le soleil se lever avant une grande épreuve,2,Jour & nuit,TRUE
-408,Musique pour traverser une gare avant le premier train,Musique pour traverser une gare juste après le départ du dernier train,2,Jour & nuit,TRUE
-409,Musique pour rester dans la pénombre avec tes pensées,Musique pour ouvrir les rideaux et laisser entrer le matin,2,Jour & nuit,TRUE
-410,Musique pour une promenade à la pleine lune,Musique pour une promenade à la lueur des lampadaires,2,Jour & nuit,TRUE
-411,Musique pour ton premier saut en parachute,Musique pour un vol paisible en parapente au-dessus des montagnes,2,Défis & changements,TRUE
-412,Musique pour quitter un confort qui t’ennuie,Musique pour construire ton premier refuge après une période instable,2,Défis & changements,TRUE
-413,Musique pour apprendre à dire non,Musique pour oser demander de l’aide,2,Défis & changements,TRUE
-414,Musique pour annoncer une décision que tes proches vont contester,Musique pour maintenir une décision malgré le désaccord de tes proches,2,Défis & changements,TRUE
-415,Musique pour accepter un pari un peu fou devant tes amis,Musique pour t’entraîner en secret afin de gagner un pari avec tes amis,2,Défis & changements,TRUE
-416,Musique pour partir voyager avec un billet aller simple,Musique pour entreprendre un pèlerinage attendu depuis des années,2,Défis & changements,TRUE
-417,Musique pour choisir entre deux personnes que tu aimes,Musique pour choisir de rester seul quelque temps,2,Défis & changements,TRUE
-418,Musique pour renoncer à un rêve devenu trop lourd,Musique pour reconstruire un rêve après un échec,2,Défis & changements,TRUE
-419,Musique pour aller seul à ton premier cours de théâtre,Musique pour jouer enfin devant un public,2,Défis & changements,TRUE
-420,Musique pour avouer un mensonge à quelqu’un que tu aimes,Musique pour continuer à mentir en craignant d’être découvert,2,Défis & changements,TRUE
-421,Musique pour affronter une foule hostile,Musique pour garder ton calme face à une personne intimidante,2,Défis & changements,TRUE
-422,Musique pour calmer ton trac juste avant d’entrer sur scène,Musique pour savourer les applaudissements après ta prestation,2,Défis & changements,TRUE
-423,Musique pour lancer une petite entreprise avec tes amis,Musique pour signer seul le contrat qui change ta carrière,2,Défis & changements,TRUE
-424,Musique pour tenter un exploit pour la première fois,Musique pour tenter un exploit une dernière fois avant de renoncer,2,Défis & changements,TRUE
-425,Musique pour suivre ton intuition malgré les avertissements,Musique pour renoncer à ton intuition afin de protéger quelqu’un,2,Défis & changements,TRUE
-426,Musique pour une procession aux flambeaux,Musique pour un défilé de carnaval,1,Fêtes & traditions,TRUE
-427,Musique pour un feu d’artifice au-dessus d’une ville,Musique pour un lâcher de lanternes au-dessus d’un lac,1,Fêtes & traditions,TRUE
-428,Musique pour un bal masqué dans un palais,Musique pour une fête déguisée dans un appartement,1,Fêtes & traditions,TRUE
-429,Musique pour une parade militaire,Musique pour un défilé de supporters après une victoire,1,Fêtes & traditions,TRUE
-430,Musique pour un mariage champêtre,Musique pour un mariage dans un grand hôtel,2,Fêtes & traditions,TRUE
-431,Musique pour une veillée de contes au coin du feu,Musique pour un spectacle de contes devant un grand public,1,Fêtes & traditions,TRUE
-432,Musique pour un enterrement solennel,Musique pour célébrer la vie d’un disparu en musique,2,Fêtes & traditions,TRUE
-433,Musique pour une fête des récoltes à la campagne,Musique pour l’inauguration d’un gratte-ciel,2,Fêtes & traditions,TRUE
-434,Musique pour l’arrivée d’un souverain à son couronnement,Musique pour le départ d’un souverain qui vient de renoncer au trône,2,Fêtes & traditions,TRUE
-435,Musique pour une cérémonie qui célèbre la paix,Musique pour une manifestation qui réclame la paix,2,Fêtes & traditions,TRUE
-436,Musique pour un chat qui guette une souris,Musique pour un chien qui court retrouver son maître,1,Nature & animaux,TRUE
-437,Musique pour le vol d’un grand aigle,Musique pour le vol d’une nuée d’hirondelles,2,Nature & animaux,TRUE
-438,Musique pour une baleine qui traverse l’océan,Musique pour un banc de dauphins qui joue près d’un bateau,2,Nature & animaux,TRUE
-439,Musique pour un cheval qui galope librement,Musique pour un cheval qui entre dans une parade,2,Nature & animaux,TRUE
-440,Musique pour un loup solitaire au loin,Musique pour une meute qui traverse la forêt,2,Nature & animaux,TRUE
-441,Musique pour une rivière qui serpente dans les prés,Musique pour une cascade qui tombe entre les rochers,2,Nature & animaux,TRUE
-442,Musique pour un volcan encore endormi,Musique pour une coulée de lave qui avance lentement,2,Nature & animaux,TRUE
-443,Musique pour une grotte couverte de cristaux,Musique pour une forêt éclairée par des lucioles,1,Nature & animaux,TRUE
-444,Musique pour un jardin soigneusement taillé autour d’un château,Musique pour un jardin abandonné repris par la nature,2,Nature & animaux,TRUE
-445,Musique pour marcher sur un lac gelé,Musique pour traverser une dune de sable,2,Nature & animaux,TRUE
-446,Musique pour un vampire charmeur qui entre dans un bal,Musique pour un fantôme mélancolique qui hante une salle de bal,2,Portraits & personnages,TRUE
-447,Musique pour un cow-boy qui arrive en ville,Musique pour un shérif qui attend un inconnu devant le saloon,2,Portraits & personnages,TRUE
-448,Musique pour un pirate qui cherche un trésor,Musique pour un contrebandier qui évite les patrouilles,2,Portraits & personnages,TRUE
-449,Musique pour une sorcière qui prépare un philtre d’amour,Musique pour une sorcière qui prépare un sort de vengeance,1,Portraits & personnages,TRUE
-450,Musique pour un magicien qui fait apparaître un palais,Musique pour un illusionniste qui fait disparaître un bijou,2,Portraits & personnages,TRUE
-451,Musique pour un robot qui découvre les émotions,Musique pour un humain qui essaie de ne plus rien ressentir,3,Portraits & personnages,TRUE
-452,Musique pour un astronaute qui découvre une planète,Musique pour un extraterrestre qui découvre notre ville,2,Portraits & personnages,TRUE
-453,Musique pour un chevalier fidèle à son serment,Musique pour un mercenaire qui se bat pour sa liberté,2,Portraits & personnages,TRUE
-454,Musique pour un souverain aimé de son peuple,Musique pour un souverain craint de son peuple,1,Portraits & personnages,TRUE
-455,Musique pour un détective fatigué dans un bureau enfumé,Musique pour un journaliste pressé qui tient une révélation,2,Portraits & personnages,TRUE
-456,Musique pour une diva qui entre en scène,Musique pour une chanteuse timide qui ose son premier solo,1,Portraits & personnages,TRUE
-457,Musique pour un clown qui veut faire rire,Musique pour un clown triste quand le chapiteau est vide,1,Portraits & personnages,TRUE
-458,Musique pour un aristocrate qui cache sa ruine,Musique pour un nouveau riche qui affiche sa fortune,3,Portraits & personnages,TRUE
-459,Musique pour un navigateur qui suit les étoiles,Musique pour un explorateur qui suit une carte mystérieuse,2,Portraits & personnages,TRUE
-460,Musique pour un savant émerveillé par sa découverte,Musique pour un savant effrayé par les conséquences de sa découverte,2,Portraits & personnages,TRUE
-461,Musique pour embrasser quelqu’un à l’abri des regards,Musique pour embrasser quelqu’un devant une foule qui applaudit,2,Scènes de vie,TRUE
-462,Musique pour négocier un prix dans un marché,Musique pour enchérir sur un objet dans une vente prestigieuse,2,Scènes de vie,TRUE
-463,Musique pour attendre un rendez-vous important dans un hall luxueux,Musique pour monter dans un ascenseur vers un rendez-vous important,2,Scènes de vie,TRUE
-464,Musique pour peindre un portrait réaliste,Musique pour peindre un tableau abstrait plein de mouvement,2,Scènes de vie,TRUE
-465,Musique pour contempler une œuvre que tu viens d’achever,Musique pour effacer une œuvre que tu viens d’achever et recommencer,2,Scènes de vie,TRUE
-466,Musique pour essayer une robe de soirée devant le miroir,Musique pour entrer au bal dans une robe de soirée,2,Scènes de vie,TRUE
-467,Musique pour chanter une sérénade sous un balcon,Musique pour écrire un poème d’amour que tu n’oseras pas envoyer,2,Scènes de vie,TRUE
-468,Musique pour trinquer à un accord enfin signé,Musique pour négocier les dernières conditions d’un accord important,2,Scènes de vie,TRUE
-469,Musique pour se retrouver bloqués ensemble par une tempête,Musique pour décider de sortir ensemble malgré la tempête,2,Scènes de vie,TRUE
-470,Musique pour ouvrir les portes d’un petit commerce pour la première fois,Musique pour baisser le rideau de ton commerce après trente ans d’activité,2,Scènes de vie,TRUE
-471,Musique pour une basse qui donne envie de se balancer,Musique pour une batterie qui donne envie de bondir,2,Culture musicale,TRUE
-472,Musique pour une guitare qui semble pleurer,Musique pour une guitare qui semble provoquer un duel,2,Culture musicale,TRUE
-473,Musique pour une voix qui ressemble à une confidence,Musique pour une voix qui ressemble à une prière,3,Culture musicale,TRUE
-474,Musique pour un morceau qui donne l’impression de flotter,Musique pour un morceau qui donne l’impression de tourner en rond,2,Culture musicale,TRUE
-475,Musique pour une chanson adressée à une seule personne,Musique pour une chanson adressée à toute une génération,2,Culture musicale,TRUE
-476,Musique pour un refrain à chanter dans un stade,Musique pour un refrain à chanter au creux de l’oreille,2,Culture musicale,TRUE
-477,Musique pour une musique qui avance comme une marche,Musique pour une musique qui balance comme une valse,1,Culture musicale,TRUE
-478,Musique pour une chanson d’amour qui sonne comme une menace,Musique pour une chanson de rupture qui sonne comme une libération,3,Culture musicale,TRUE
-479,Musique pour un morceau où le silence crée la tension,Musique pour un morceau où la répétition crée la tension,3,Culture musicale,TRUE
-480,Musique pour une musique qui évoque un vieux film muet,Musique pour une musique qui évoque une comédie musicale,1,Culture musicale,TRUE
-481,Musique pour jouer au serveur très chic pendant un dîner entre amis,Musique pour animer un dîner entre amis comme une vedette de cabaret,2,Humour,TRUE
-482,Musique pour bronzer comme dans une publicité de parfum,Musique pour lutter dignement avec un parasol qui s’envole,2,Humour,TRUE
-483,Musique pour porter des lunettes de soleil comme une star incognito,Musique pour retirer tes lunettes de soleil comme si tout le monde allait te reconnaître,2,Humour,TRUE
-484,Musique pour entrer dans ton bain comme dans un spa de luxe,Musique pour traverser la salle de bains inondée comme un explorateur,1,Humour,TRUE
-485,Musique pour saluer la foule depuis ton balcon imaginaire de roi,Musique pour espionner discrètement la rue derrière ton rideau,2,Humour,TRUE
-486,Musique pour découper un gâteau comme un chirurgien,Musique pour servir les parts d’un gâteau comme un animateur de spectacle,1,Humour,TRUE
-487,Musique pour attendre le feu vert comme sur une grille de départ,Musique pour patienter dans un embouteillage comme dans une limousine,2,Humour,TRUE
-488,Musique pour nourrir des pigeons comme un souverain généreux,Musique pour reculer quand tous les pigeons arrivent en même temps,2,Humour,TRUE
-489,Musique pour ouvrir un paquet de chips en cachette,Musique pour assumer le bruit d’un paquet de chips comme une entrée fracassante,1,Humour,TRUE
-490,Musique pour annoncer la météo comme une prophétie,Musique pour commenter une averse comme une finale sportive,2,Humour,TRUE
-491,Musique pour arroser une plante comme si tu sauvais une forêt,Musique pour admirer la nouvelle feuille de ta plante comme un miracle,2,Humour,TRUE
-492,Musique pour transporter un gâteau fragile comme une bombe,Musique pour poser un gâteau intact sur la table comme un trophée,2,Humour,TRUE
-493,Musique pour choisir un parfum comme une potion de séduction,Musique pour choisir un parfum comme une armure de confiance,3,Humour,TRUE
-494,Musique pour expliquer les règles d’un jeu comme un professeur,Musique pour inventer une règle à ton avantage comme un escroc,2,Humour,TRUE
-495,Musique pour entrer dans une brocante comme un chercheur de trésor,Musique pour repartir avec une lampe comme un collectionneur milliardaire,2,Humour,TRUE
-496,Musique pour faire ton lit comme on prépare une chambre royale,Musique pour te jeter dessus comme après une grande bataille,2,Humour,TRUE
-497,Musique pour lutter contre une mouche comme dans un film d’action,Musique pour guetter une mouche comme dans un film d’espionnage,1,Humour,TRUE
-498,Musique pour te sentir à ta place pour la première fois,Musique pour revendiquer ta place malgré ceux qui t’excluent,2,Émotions,TRUE
-499,Musique pour revendiquer ta différence avec fierté,Musique pour te sentir en harmonie avec les autres,2,Émotions,TRUE
-500,Musique pour remercier quelqu’un qui a changé ta vie,Musique pour dire adieu à quelqu’un qui a changé ta vie,3,Émotions,TRUE
+1,Un son avec un couplet de fou,Un son avec un refrain de fou,2,Musique,TRUE
+2,Un son que t'aimes d'un artiste que tu détestes,Un son surcoté d'un artiste que t'adores,2,Goûts,TRUE
+3,Un son pour une soirée d'été autour d'un barbecue,Un son pour une soirée en appart,2,Ambiances,TRUE
+4,Un son goumin,Un son nostalgie,2,Émotions,TRUE
+5,Un son pour ton arrivée à un date,Un son pour ton arrivée à une soirée,2,Ambiances,TRUE
+6,Un son que tu écouteras toute ta vie,Un son exceptionnel dès la première écoute,2,Goûts,TRUE
+7,Un son pour rouler seul la nuit,Un son pour une fin de soirée dehors au lever du soleil,2,Ambiances,TRUE
+8,Un son pour ton entrée dans un combat de catch,Un son pour la BO de ton film autobiographique,2,Cinéma,TRUE
+9,Un son quand il neige,Un son quand il pleut,2,Ambiances,TRUE
+10,Une prod exceptionnelle,Une topline folle,2,Musique,TRUE
+11,Un featuring improbable mais dingue,Un featuring all time,2,Musique,TRUE
+12,Un son pour une nuit à deux,Un son pour faire une déclaration d'amour,2,Émotions,TRUE
+13,Un son pour faire twerker des meufs,Un son pour faire danser toute une boîte de nuit,2,Soirée,TRUE
+14,Un son dont le remix dépasse l'original,Un son dont l'original reste imbattable,2,Musique,TRUE
+15,Un son avec une intro incroyable,Un son avec une fin incroyable,2,Musique,TRUE
+16,Un son sauvé par sa prod,Un son sauvé par la voix de l'artiste,2,Musique,TRUE
+17,Un son que t'aimes pour ses paroles,Un son que t'aimes sans comprendre les paroles,2,Goûts,TRUE
+18,Un son où l'artiste se livre,Un son où l'artiste se la raconte,2,Musique,TRUE
+19,Un son qui te donne envie de chanter,Un son qui te donne envie de rapper,2,Musique,TRUE
+20,Un son qui mériterait une version acoustique,Un son qui mériterait un remix pour la boîte,2,Musique,TRUE
+21,Un son meilleur en live,Un son meilleur au casque,2,Musique,TRUE
+22,Un son à écouter à fond,Un son à écouter quand tout est calme,2,Musique,TRUE
+23,Un son dont tu reconnais la voix direct,Un son dont tu reconnais la prod direct,2,Musique,TRUE
+24,Un son qui n'a pas besoin de refrain,Un son dont le refrain fait tout,2,Musique,TRUE
+25,Un son beaucoup trop court,Un son long dont tu ne couperais rien,2,Musique,TRUE
+26,Un son qui mélange deux styles,Un son qui réunit deux générations,2,Musique,TRUE
+27,Un son d'un rappeur qui chante,Un son d'un chanteur qui rappe,2,Musique,TRUE
+28,Un son fait pour un stade,Un son fait pour une petite salle,2,Musique,TRUE
+29,Une reprise qui dépasse l'original,Un sample qui transforme l'original,2,Musique,TRUE
+30,Un son où t'attends le drop,Un son où t'attends le solo,2,Musique,TRUE
+31,Un son où la basse fait tout,Un son où la batterie fait tout,2,Musique,TRUE
+32,Un son que tu peux écouter dix fois de suite,Un son que tu ressors une fois par an,2,Goûts,TRUE
+33,Un son que tout le monde aime sauf toi,Un son que personne n'aime sauf toi,2,Goûts,TRUE
+34,Un son qu'on t'a trop fait écouter,Un son que t'as trop fait écouter aux autres,2,Goûts,TRUE
+35,Un son que t'aimais avant qu'il devienne un tube,Un son que t'as découvert après tout le monde,2,Goûts,TRUE
+36,Un son que t'as jugé trop vite,Un son qui t'a lassé trop vite,2,Goûts,TRUE
+37,Un son qui t'a fait aimer un artiste,Un son qui t'a fait découvrir un style,2,Goûts,TRUE
+38,Un son d'un artiste qui mérite plus de succès,Un son d'un artiste qu'on a un peu oublié,2,Goûts,TRUE
+39,Un son meilleur que le reste de l'album,Un son qui prend tout son sens dans l'album,2,Goûts,TRUE
+40,Un son que t'as découvert grâce à un clip,Un son que t'as découvert grâce à un pote,2,Souvenirs,TRUE
+41,Un son encore meilleur avec son clip,Un son encore meilleur avec les paroles sous les yeux,2,Musique,TRUE
+42,Un vieux son qui pourrait sortir aujourd'hui,Un son récent qui semble venir d'une autre époque,2,Musique,TRUE
+43,Un son que t'écoutes en cachette,Un son que tu mets pour montrer que t'as du goût,2,Goûts,TRUE
+44,Un son que tu ne zapperas jamais,Un son dont tu n'écoutes qu'un passage,2,Goûts,TRUE
+45,Un son que tu connais grâce à une pub,Un son que tu connais grâce à un jeu vidéo,2,Souvenirs,TRUE
+46,Un son qui met tout le monde d'accord,Un son qui divise ton groupe de potes,2,Goûts,TRUE
+47,Un son qui te rappelle le collège,Un son qui te rappelle tes premières sorties en boîte,2,Souvenirs,TRUE
+48,Un son que tes parents t'ont fait découvrir,Un son que t'as fait découvrir à tes parents,2,Souvenirs,TRUE
+49,Un son qui te rappelle quelqu'un,Un son qui te rappelle un endroit,2,Souvenirs,TRUE
+50,Un son que t'écoutais quand ça n'allait pas,Un son que t'écoutais quand tout allait bien,2,Souvenirs,TRUE
+51,Un son qui te rappelle ton premier amour,Un son qui te rappelle ta bande de potes,2,Souvenirs,TRUE
+52,Un son que tu veux à ton mariage,Un son que tu veux à ton enterrement,2,Émotions,TRUE
+53,Un son pour ta dernière soirée avant de déménager,Un son pour ta première soirée dans ton nouvel appart,2,Ambiances,TRUE
+54,Un son que tu veux faire découvrir à tout le monde,Un son que tu préfères garder pour toi,2,Goûts,TRUE
+55,Un son qui te rappelle les vacances,Un son qui te rappelle la route des vacances,2,Souvenirs,TRUE
+56,Un son que t'aimais sans écouter les paroles,Un son dont t'as compris les paroles en grandissant,2,Souvenirs,TRUE
+57,Un son qui te rend fier de tes origines,Un son qui te donne envie d'aller voir ailleurs,2,Émotions,TRUE
+58,Un son qui te rappelle une victoire,Un son qui t'a aidé à encaisser une défaite,2,Souvenirs,TRUE
+59,Un son que t'associes à ton meilleur pote,Un son que t'associes à quelqu'un qui n'est plus dans ta vie,2,Souvenirs,TRUE
+60,Un son qui te représentait à 15 ans,Un son qui te représente aujourd'hui,2,Souvenirs,TRUE
+61,Un son pour un long trajet avec tes potes,Un son pour un long trajet avec tes parents,2,Ambiances,TRUE
+62,Un son pour prendre la route des vacances,Un son pour prendre la route du retour,2,Ambiances,TRUE
+63,Un son pour l'apéro,Un son pour l'after,2,Soirée,TRUE
+64,Un son que tu mets en soirée avec tes potes,Un son que tu mets en soirée quand tu connais personne,2,Soirée,TRUE
+65,Un son pour chauffer la salle,Un son pour finir la soirée,2,Soirée,TRUE
+66,Un son pour un karaoké,Un son pour tenter The Voice,2,Soirée,TRUE
+67,Un son pour danser collé-serré,Un son pour danser seul devant ton miroir,2,Ambiances,TRUE
+68,Un son pour une soirée chic,Un son pour une soirée qui part en vrille,2,Soirée,TRUE
+69,Un son pour sortir de ton goumin,Un son pour replonger dans ton goumin,2,Émotions,TRUE
+70,Un son à envoyer à ton crush,Un son à envoyer à ton ex,2,Émotions,TRUE
+71,Un son pour te sentir irrésistible,Un son pour te sentir intouchable,2,Émotions,TRUE
+72,Un son pour marcher avec trop de confiance,Un son pour te dépasser à la salle,2,Ambiances,TRUE
+73,Un son pour te motiver avant un examen,Un son pour fêter un examen réussi,2,Ambiances,TRUE
+74,Un son pour hurler ta rage,Un son pour pleurer un bon coup,2,Émotions,TRUE
+75,Un son pour oublier tes problèmes,Un son qui met des mots sur tes problèmes,2,Émotions,TRUE
+76,Un son pour envoyer balader quelqu'un,Un son pour demander pardon,2,Émotions,TRUE
+77,Un son pour un amour sain,Un son pour une relation toxique,2,Émotions,TRUE
+78,Un son pour dire « tu me plais »,Un son pour dire « tu me manques »,2,Émotions,TRUE
+79,Un son pour te rappeler ce que tu vaux,Un son pour montrer à tout le monde ce que tu vaux,2,Émotions,TRUE
+80,Un son qui te fait sourire même quand ça va mal,Un son qui te fait pleurer même quand tout va bien,2,Émotions,TRUE
+81,Un son pour le métro un lundi matin,Un son pour rentrer du travail un vendredi soir,2,Ambiances,TRUE
+82,Un son pour cuisiner en dansant,Un son pour un dîner aux chandelles,2,Ambiances,TRUE
+83,Un son pour traîner au lit,Un son pour te sortir du lit,2,Ambiances,TRUE
+84,Un son pour un dimanche qui déprime,Un son pour un dimanche au soleil,2,Ambiances,TRUE
+85,Un son pour regarder la mer,Un son pour regarder les lumières de la ville,2,Ambiances,TRUE
+86,Un son pour une journée à la plage,Un son pour une nuit à la belle étoile,2,Ambiances,TRUE
+87,Un son pour l'entrée du héros,Un son pour l'entrée du méchant,2,Cinéma,TRUE
+88,Un son pour une course-poursuite,Un son pour une scène au ralenti,2,Cinéma,TRUE
+89,Un son pour une scène de premier baiser,Un son pour une scène de séparation,2,Cinéma,TRUE
+90,Un son qui irait dans une pub de parfum,Un son qui irait dans une pub de voiture,2,Cinéma,TRUE
+91,Un son pour ouvrir un concert,Un son pour le rappel d'un concert,2,Musique,TRUE
+92,Un son qui raconte une histoire,Un son qui installe une ambiance,2,Musique,TRUE
+93,Un son joyeux avec des paroles tristes,Un son triste avec des paroles pleines d'espoir,2,Musique,TRUE
+94,Un son pour convaincre quelqu'un d'écouter du rap,Un son pour convaincre quelqu'un d'écouter de la pop,2,Goûts,TRUE
+95,Un son que t'aimerais avoir écrit,Un son que t'aimerais savoir chanter,2,Goûts,TRUE
+96,Un son que tu chanterais devant 10 000 personnes,Un son que tu n'oses chanter que sous la douche,2,Goûts,TRUE
+97,Un son à la guitare au feu de camp,Un son sur une enceinte à la plage,2,Ambiances,TRUE
+98,Un son qui te donne envie d'être amoureux,Un son qui te fait kiffer ton célibat,2,Émotions,TRUE
+99,Un son dont tu retiens une punchline,Un son dont tu retiens une mélodie,2,Musique,TRUE
+100,Un son qui mettrait le feu à un festival,Un son qui ferait taire toute la salle,2,Musique,TRUE

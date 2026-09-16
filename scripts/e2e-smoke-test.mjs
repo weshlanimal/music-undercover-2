@@ -12,6 +12,9 @@ function makeClient(nickname) {
   let secret = null;
   let playerId = null;
   let roomCode = null;
+  let lastError = null;
+  let lastControl = null;
+  let errorCount = 0;
 
   socket.on("connect_error", (err) => console.error(`❌ [${nickname}] connect_error:`, err.message));
   socket.on("room:state", (s) => {
@@ -25,7 +28,12 @@ function makeClient(nickname) {
     roomCode = p.roomCode;
   });
   socket.on("room:error", (p) => {
+    lastError = p.message;
+    errorCount += 1;
     console.error(`❌ [${nickname}] erreur serveur:`, p.message);
+  });
+  socket.on("clue:control", (p) => {
+    lastControl = p;
   });
 
   return {
@@ -42,6 +50,21 @@ function makeClient(nickname) {
     },
     get roomCode() {
       return roomCode;
+    },
+    get lastError() {
+      return lastError;
+    },
+    get lastControl() {
+      return lastControl;
+    },
+    get errorCount() {
+      return errorCount;
+    },
+    clearError() {
+      lastError = null;
+    },
+    clearControl() {
+      lastControl = null;
     }
   };
 }
@@ -124,6 +147,9 @@ async function runScenario(name, fn, timeoutMs = 20_000) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Scénario 1 : match complet, Mr White désactivé (un seul tour de vote).
+// ---------------------------------------------------------------------------
 async function scenarioMainMatch() {
   const alex = makeClient("Alex");
   const sarah = makeClient("Sarah");
@@ -131,14 +157,15 @@ async function scenarioMainMatch() {
   const players = [alex, sarah, lucas];
   await wait(400);
 
-  // Score cible à 1 : dès qu'une manche est remportée par un camp, le match
-  // se termine immédiatement — pratique pour un test rapide et déterministe.
+  // Score cible à 1 : dès qu'une manche est remportée, le match se termine
+  // immédiatement — pratique pour un test rapide et déterministe.
   alex.socket.emit("room:create", {
     nickname: "Alex",
-    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: false, targetScore: 1 }
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 1 }
   });
   await waitFor(() => alex.roomCode, "Alex a créé la salle");
   assert(alex.state.settings.maxPlayers === 16, "Le nombre de joueurs max par défaut est bien passé à 16");
+  assert(!("undercoverCount" in alex.state.settings), "Le nombre d'infiltrés n'est plus un réglage — toujours exactement un seul");
 
   sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
   lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
@@ -151,10 +178,10 @@ async function scenarioMainMatch() {
   assert(alex.state.roundNumber === 1, "La manche 1 commence bien");
 
   const groups = groupByTheme(players);
-  assert(groups.size === 2, "Deux thèmes distincts circulent (1 infiltré configuré, pas de Mr White)");
+  assert(groups.size === 2, "Deux thèmes distincts circulent (exactement un infiltré, pas de Mr White)");
   const civilGroup = [...groups.values()].find((g) => g.length === 2);
   const undercoverGroup = [...groups.values()].find((g) => g.length === 1);
-  assert(!!civilGroup && !!undercoverGroup, "Répartition 2 civils / 1 infiltré, comme configuré dans le lobby");
+  assert(!!civilGroup && !!undercoverGroup, "Répartition 2 civils / 1 infiltré");
 
   // --- La manche n'avance QUE quand tout le monde a cliqué "J'ai compris" ---
   sarah.socket.emit("role:ack", {});
@@ -177,23 +204,26 @@ async function scenarioMainMatch() {
   assert(alex.state.discussionReadyCount === 1, "Le compteur de joueurs prêts progresse en direct (1/3)");
   civilB.socket.emit("discussion:ready", {});
   undercoverPlayer.socket.emit("discussion:ready", {});
-  await Promise.all(players.map((p) => waitForPhase(p, "voting", 5000)));
-  assert(true, "Le vote démarre dès que tout le monde est prêt");
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+  assert(true, "Le tour de vote pour l'infiltré démarre dès que tout le monde est prêt");
 
-  // --- Vote multiple : chaque joueur peut cocher plusieurs suspects ---
-  civilA.socket.emit("vote:submit", { targetIds: [undercoverPlayer.playerId, civilB.playerId] });
-  await waitFor(() => alex.state.votesSubmittedCount === 1, "Un vote à plusieurs cibles est bien pris en compte");
-  civilB.socket.emit("vote:submit", { targetIds: [undercoverPlayer.playerId] });
-  undercoverPlayer.socket.emit("vote:submit", { targetIds: [civilA.playerId] });
+  // --- Un seul suspect par bulletin (cible unique, pas de tableau) ---
+  civilA.socket.emit("vote:submit", { targetId: undercoverPlayer.playerId });
+  await waitFor(() => alex.state.votesSubmittedCount === 1, "Un vote à cible unique est bien pris en compte");
+  assert(alex.state.voteReveal === null, "Aucun résultat n'est exposé pendant le vote lui-même");
+  civilB.socket.emit("vote:submit", { targetId: undercoverPlayer.playerId });
+  undercoverPlayer.socket.emit("vote:submit", { targetId: civilA.playerId });
 
+  // Mr White désactivé : un seul tour de vote, on va directement à la révélation.
   await Promise.all(players.map((p) => waitForPhase(p, "elimination", 8000)));
+  assert(alex.state.voteReveal !== null, "La révélation apparaît dès que le(s) tour(s) de vote sont clos");
+  assert(alex.state.voteReveal.undercoverAccusedId === undercoverPlayer.playerId, "L'infiltré (2 votes sur 3) est bien désigné par le premier tour");
+  assert(alex.state.voteReveal.mrWhiteTally === null, "Aucun tour Mr White n'a eu lieu (désactivé) — le tally correspondant est null");
   assert(
-    alex.state.lastEliminatedPlayerIds.includes(undercoverPlayer.playerId),
-    "L'infiltré (2 votes sur 3, majorité absolue) est bien éliminé"
-  );
-  assert(
-    !alex.state.lastEliminatedPlayerIds.includes(civilA.playerId) && !alex.state.lastEliminatedPlayerIds.includes(civilB.playerId),
-    "Les civils, qui n'ont reçu qu'un seul vote chacun, ne sont PAS éliminés (majorité absolue non atteinte)"
+    alex.state.lastEliminatedPlayerIds.includes(undercoverPlayer.playerId) &&
+      !alex.state.lastEliminatedPlayerIds.includes(civilA.playerId) &&
+      !alex.state.lastEliminatedPlayerIds.includes(civilB.playerId),
+    "Seul l'infiltré désigné est éliminé"
   );
   assert(alex.state.lastEliminatedRoles[undercoverPlayer.playerId] === "undercover", "Le rôle révélé à l'élimination est bien 'undercover'");
 
@@ -205,7 +235,7 @@ async function scenarioMainMatch() {
   const civilScore = alex.state.players.find((p) => p.id === civilA.playerId).score;
   const undercoverScore = alex.state.players.find((p) => p.id === undercoverPlayer.playerId).score;
   assert(civilScore === 1, `Le civil survivant gagne +1 point individuellement (score=${civilScore})`);
-  assert(undercoverScore === 0, `L'infiltré éliminé gagne 0 point, peu importe le sort des autres (score=${undercoverScore})`);
+  assert(undercoverScore === 0, `L'infiltré éliminé gagne 0 point (score=${undercoverScore})`);
 
   // --- Score cible = 1 : le match doit se terminer immédiatement ---
   await waitForPhase(alex, "game_over", 8000);
@@ -218,6 +248,85 @@ async function scenarioMainMatch() {
   players.forEach((p) => p.socket.disconnect());
 }
 
+// ---------------------------------------------------------------------------
+// Scénario 2 : Mr White activé — deux tours de vote, rien révélé entre les deux.
+// ---------------------------------------------------------------------------
+async function scenarioTwoVoteRounds() {
+  const p1 = makeClient("Malo");
+  const p2 = makeClient("Chloe");
+  const p3 = makeClient("Adam");
+  const p4 = makeClient("Zoe");
+  const players = [p1, p2, p3, p4];
+  await wait(400);
+
+  p1.socket.emit("room:create", {
+    nickname: "Malo",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: true, targetScore: 100 }
+  });
+  await waitFor(() => p1.roomCode, "Malo a créé une salle avec Mr White activé");
+  p2.socket.emit("room:join", { code: p1.roomCode, nickname: "Chloe" });
+  p3.socket.emit("room:join", { code: p1.roomCode, nickname: "Adam" });
+  p4.socket.emit("room:join", { code: p1.roomCode, nickname: "Zoe" });
+  await waitFor(() => p2.playerId && p3.playerId && p4.playerId, "Les 3 invités ont rejoint");
+
+  p1.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => players.every((p) => p.secret), "Les 4 joueurs ont reçu leur secret");
+
+  const withTheme = players.filter((p) => p.secret.theme !== null);
+  const withoutTheme = players.filter((p) => p.secret.theme === null);
+  assert(withoutTheme.length === 1, "Exactement un joueur reçoit 'aucun thème' (Mr White)");
+  assert(withTheme.length === 3, "Les 3 autres joueurs (civils + infiltré) reçoivent bien un thème");
+  const mrWhitePlayer = withoutTheme[0];
+  const groups = groupByTheme(withTheme);
+  const civilGroup = [...groups.values()].find((g) => g.length === 2);
+  const undercoverGroup = [...groups.values()].find((g) => g.length === 1);
+  const undercoverPlayer = undercoverGroup[0];
+
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+  await playOneRound(players, p1);
+  players.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+
+  // Tour 1 : tout le monde vote juste pour l'infiltré.
+  const votersRound1 = players.filter((p) => p !== undercoverPlayer);
+  votersRound1.forEach((p) => p.socket.emit("vote:submit", { targetId: undercoverPlayer.playerId }));
+  undercoverPlayer.socket.emit("vote:submit", { targetId: civilGroup[0].playerId });
+
+  // Le second tour démarre SANS rien révéler du premier.
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_mrwhite", 8000)));
+  assert(players.every((p) => p.state.voteReveal === null), "Le résultat du 1er tour (infiltré) n'est révélé à PERSONNE avant la fin du 2e tour");
+  assert(players.every((p) => p.state.votesSubmittedCount === 0), "Le compteur de votes repart bien à 0 pour le second tour");
+
+  // Tour 2 : tout le monde vote juste pour Mr White.
+  const votersRound2 = players.filter((p) => p !== mrWhitePlayer);
+  votersRound2.forEach((p) => p.socket.emit("vote:submit", { targetId: mrWhitePlayer.playerId }));
+  mrWhitePlayer.socket.emit("vote:submit", { targetId: civilGroup[1].playerId });
+
+  await Promise.all(players.map((p) => waitForPhase(p, "elimination", 8000)));
+  assert(!!players[0].state.voteReveal, "La révélation combinée apparaît une fois les DEUX tours clos");
+  assert(
+    players[0].state.voteReveal.undercoverAccusedId === undercoverPlayer.playerId,
+    "Le résultat du tour 1 (infiltré), gardé caché jusque-là, est maintenant révélé correctement"
+  );
+  assert(
+    players[0].state.voteReveal.mrWhiteAccusedId === mrWhitePlayer.playerId,
+    "Le résultat du tour 2 (Mr White) est également révélé correctement"
+  );
+  assert(
+    players[0].state.lastEliminatedPlayerIds.length === 2 &&
+      players[0].state.lastEliminatedPlayerIds.includes(undercoverPlayer.playerId) &&
+      players[0].state.lastEliminatedPlayerIds.includes(mrWhitePlayer.playerId),
+    "L'infiltré ET Mr White sont éliminés ensemble (deux personnes désignées par les deux tours)"
+  );
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
+// ---------------------------------------------------------------------------
+// Scénario 3 : enchaînement automatique des manches (score cible non atteint).
+// ---------------------------------------------------------------------------
 async function scenarioRoundContinuation() {
   const a2 = makeClient("Nora");
   const b2 = makeClient("Yanis");
@@ -227,7 +336,7 @@ async function scenarioRoundContinuation() {
 
   a2.socket.emit("room:create", {
     nickname: "Nora",
-    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: false, targetScore: 100 }
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
   });
   await waitFor(() => a2.roomCode, "Nora a créé une salle avec un score cible élevé (100)");
   b2.socket.emit("room:join", { code: a2.roomCode, nickname: "Yanis" });
@@ -242,20 +351,19 @@ async function scenarioRoundContinuation() {
 
   await playOneRound(trio2, a2);
   trio2.forEach((p) => p.socket.emit("discussion:ready", {}));
-  await Promise.all(trio2.map((p) => waitForPhase(p, "voting", 5000)));
-  // Personne ne vote pour personne : le camp méchant gagne automatiquement la manche.
-  trio2.forEach((p) => p.socket.emit("vote:submit", { targetIds: [] }));
+  await Promise.all(trio2.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+  // Égalité : chacun vote pour un joueur différent -> personne n'est désigné.
+  const [pA, pB, pC] = trio2;
+  pA.socket.emit("vote:submit", { targetId: pB.playerId });
+  pB.socket.emit("vote:submit", { targetId: pC.playerId });
+  pC.socket.emit("vote:submit", { targetId: pA.playerId });
 
   await waitForPhase(a2, "round_result", 8000);
-  assert(
-    a2.state.lastEliminatedPlayerIds.length === 0,
-    "Personne n'est éliminé (personne n'a voté pour personne)"
-  );
+  assert(a2.state.lastEliminatedPlayerIds.length === 0, "Égalité au premier tour : personne n'est désigné, personne n'est éliminé");
   const totalScore = a2.state.players.reduce((sum, p) => sum + p.score, 0);
-  // Score individuel : personne n'étant éliminé, TOUT LE MONDE gagne selon
-  // son propre rôle (2 civils +1 chacun, 1 infiltré +2) = 4, et non pas
-  // seulement l'infiltré comme dans une logique d'équipe (qui aurait donné 2).
-  assert(totalScore === 4, `Chaque joueur gagne ses points individuellement selon son propre rôle, pas en équipe (total=${totalScore}, attendu 4)`);
+  // Score individuel : personne n'étant éliminé, TOUT LE MONDE survit et gagne
+  // selon son propre rôle (2 civils +1 chacun, 1 infiltré +2) = 4.
+  assert(totalScore === 4, `Chaque joueur gagne ses points individuellement selon son propre rôle (total=${totalScore}, attendu 4)`);
   assert(a2.state.status === "in_progress", "Le match continue (score cible à 100, personne ne l'a atteint)");
 
   await waitForPhase(a2, "role_reveal", 8000);
@@ -265,36 +373,88 @@ async function scenarioRoundContinuation() {
   trio2.forEach((p) => p.socket.disconnect());
 }
 
-async function scenarioMrWhite() {
-  const p1 = makeClient("Malo");
-  const p2 = makeClient("Chloe");
-  const p3 = makeClient("Adam");
-  const p4 = makeClient("Zoe");
-  const quatuor = [p1, p2, p3, p4];
+// ---------------------------------------------------------------------------
+// Scénario 4 : contrôle de lecture watch2gether + bouton "Passer".
+// ---------------------------------------------------------------------------
+async function scenarioPlaybackControlAndSkip() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
   await wait(400);
 
-  p1.socket.emit("room:create", {
-    nickname: "Malo",
-    settings: { timers: { enabled: false }, undercoverCount: 1, mrWhiteEnabled: true, targetScore: 1 }
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
   });
-  await waitFor(() => p1.roomCode, "Malo a créé une salle avec Mr White activé");
-  p2.socket.emit("room:join", { code: p1.roomCode, nickname: "Chloe" });
-  p3.socket.emit("room:join", { code: p1.roomCode, nickname: "Adam" });
-  p4.socket.emit("room:join", { code: p1.roomCode, nickname: "Zoe" });
-  await waitFor(() => p2.playerId && p3.playerId && p4.playerId, "Les 3 invités ont rejoint");
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
 
-  p1.socket.emit("host:start_game", {});
-  await Promise.all(quatuor.map((p) => waitForPhase(p, "role_reveal")));
-  await waitFor(() => quatuor.every((p) => p.secret), "Les 4 joueurs ont reçu leur secret");
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
 
-  const withTheme = quatuor.filter((p) => p.secret.theme !== null);
-  const withoutTheme = quatuor.filter((p) => p.secret.theme === null);
-  assert(withoutTheme.length === 1, "Exactement un joueur reçoit 'aucun thème' (Mr White)");
-  assert(withTheme.length === 3, "Les 3 autres joueurs (civils + infiltré) reçoivent bien un thème");
+  const currentId = alex.state.currentTurnPlayerId;
+  const presenter = players.find((p) => p.playerId === currentId);
+  const others = players.filter((p) => p !== presenter);
 
-  quatuor.forEach((p) => p.socket.disconnect());
+  presenter.socket.emit("music:submit_url", { url: "mock://demo-01" });
+  await Promise.all(players.map((p) => waitForPhase(p, "clue_playback", 5000)));
+
+  // Un joueur qui n'a PAS envoyé cet indice ne doit pas pouvoir piloter la lecture pour les autres.
+  others[0].clearError();
+  others[0].socket.emit("clue:control_send", { action: "pause", positionSeconds: 1 });
+  await waitFor(() => others[0].lastError, "Le serveur refuse une commande de lecture venant d'un non-présentateur");
+
+  // Le présentateur peut piloter, et ça se diffuse à TOUT le monde.
+  players.forEach((p) => p.clearControl());
+  presenter.socket.emit("clue:control_send", { action: "pause", positionSeconds: 2.5 });
+  await Promise.all(players.map((p) => waitFor(() => p.lastControl, `${p.nickname} reçoit bien l'ordre de lecture diffusé`)));
+  assert(
+    players.every((p) => p.lastControl.action === "pause" && Math.abs(p.lastControl.positionSeconds - 2.5) < 0.01),
+    "La commande diffusée (pause à 2.5s) est identique pour tout le monde, y compris le présentateur lui-même"
+  );
+
+  // --- Bouton "Passer" : réservé au présentateur ---
+  others[1].clearError();
+  others[1].socket.emit("clue:skip", {});
+  await waitFor(() => others[1].lastError, "Un non-présentateur ne peut pas utiliser le bouton 'Passer'");
+  assert(alex.state.phase === "clue_playback", "La phase n'a pas bougé suite à la tentative refusée");
+
+  const skipStart = Date.now();
+  presenter.socket.emit("clue:skip", {});
+  await Promise.all(players.map((p) => waitFor(() => p.state.phase !== "clue_playback", `${p.nickname} quitte bien clue_playback après le skip`)));
+  const elapsed = Date.now() - skipStart;
+  assert(elapsed < 3000, `Le skip fait avancer la partie quasi immédiatement, sans attendre le minuteur complet (${elapsed}ms)`);
+
+  players.forEach((p) => p.socket.disconnect());
 }
 
+// ---------------------------------------------------------------------------
+// Scénario 5 : le bug "session inconnue" ne se produit plus au premier chargement.
+// ---------------------------------------------------------------------------
+async function scenarioSilentRejoin() {
+  const fresh = makeClient("NouveauVisiteur");
+  await wait(400);
+
+  // Simule exactement ce que fait un tout nouveau visiteur : une session
+  // jamais liée à aucune salle. Avant le correctif, ceci déclenchait un
+  // message d'erreur visible ("Session inconnue.") dès l'arrivée sur la page.
+  fresh.socket.emit("session:rejoin", { sessionId: "session-jamais-vue-" + Date.now() });
+  await wait(1500);
+
+  assert(fresh.errorCount === 0, "Aucune erreur n'est remontée pour une session inconnue lors du premier chargement");
+  assert(fresh.lastError === null, "Le message 'Session inconnue' n'apparaît plus jamais côté client");
+
+  fresh.socket.disconnect();
+}
+
+// ---------------------------------------------------------------------------
+// Scénario 6 : bouton "Quitter" en lobby.
+// ---------------------------------------------------------------------------
 async function scenarioLeaveRoom() {
   const host2 = makeClient("Yasmine");
   const guest2a = makeClient("Kevin");
@@ -325,9 +485,11 @@ async function scenarioLeaveRoom() {
 async function main() {
   console.log("🧪 Test end-to-end — Music Undercover\n" + "═".repeat(50));
 
-  await runScenario("Match principal (rôles configurables, vote multiple, points)", scenarioMainMatch, 45_000);
-  await runScenario("Enchaînement automatique des manches", scenarioRoundContinuation, 55_000);
-  await runScenario("Mr White (aucun thème)", scenarioMrWhite, 15_000);
+  await runScenario("Match principal (un seul infiltré, vote à cible unique)", scenarioMainMatch, 45_000);
+  await runScenario("Deux tours de vote (Mr White) sans rien révéler entre les deux", scenarioTwoVoteRounds, 45_000);
+  await runScenario("Enchaînement automatique des manches", scenarioRoundContinuation, 45_000);
+  await runScenario("Contrôle de lecture watch2gether + bouton Passer", scenarioPlaybackControlAndSkip, 20_000);
+  await runScenario("Reconnexion silencieuse (bug session inconnue)", scenarioSilentRejoin, 10_000);
   await runScenario("Quitter la salle en lobby", scenarioLeaveRoom, 15_000);
 
   console.log("\n" + "═".repeat(50));
@@ -345,6 +507,6 @@ main().catch((err) => {
 });
 
 setTimeout(() => {
-  console.error("\n❌ Timeout global absolu (180s) — le process est forcé de s'arrêter.");
+  console.error("\n❌ Timeout global absolu (200s) — le process est forcé de s'arrêter.");
   process.exit(1);
-}, 180_000);
+}, 200_000);

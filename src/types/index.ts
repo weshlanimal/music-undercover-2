@@ -14,10 +14,12 @@
 //
 // Format de partie : un "match" enchaîne plusieurs MANCHES (chacune : un
 // thème, des rôles neufs, un tour de musique par joueur, une discussion,
-// un vote) jusqu'à ce qu'un·e joueur·se atteigne le score cible configuré
-// par l'hôte. Les rôles sont configurables (nombre d'infiltrés, Mr White
-// activable) et le vote peut éliminer plusieurs joueurs en une fois — au
-// vu du nombre de "méchants" potentiellement en jeu.
+// deux votes) jusqu'à ce qu'un·e joueur·se atteigne le score cible configuré
+// par l'hôte. Toujours EXACTEMENT UN infiltré ; Mr White optionnel. Le vote
+// se déroule en deux tours à cible UNIQUE (jamais plusieurs suspects à la
+// fois, pour éviter le n'importe quoi) : d'abord qui est l'infiltré, puis
+// (si Mr White est activé) qui est Mr White — sans révéler le résultat du
+// premier tour avant la fin du second.
 // ---------------------------------------------------------------------------
 
 export type Role = "civil" | "undercover" | "mrwhite";
@@ -35,7 +37,6 @@ export interface ThemePair {
 
 export interface RoomSettings {
   maxPlayers: number; // 3..16
-  undercoverCount: number; // nombre d'infiltrés, configurable par l'hôte
   mrWhiteEnabled: boolean;
   /** Score à atteindre pour remporter le match (plusieurs manches enchaînées). */
   targetScore: number;
@@ -52,7 +53,6 @@ export interface RoomSettings {
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   maxPlayers: 16,
-  undercoverCount: 1,
   mrWhiteEnabled: false,
   targetScore: 3,
   timers: {
@@ -73,8 +73,8 @@ export type GamePhase =
   | "clue_playback"
   | "next_player"
   | "discussion"
-  | "voting"
-  | "vote_result"
+  | "voting_undercover"
+  | "voting_mrwhite"
   | "elimination"
   | "round_result"
   | "game_over";
@@ -127,6 +127,22 @@ export interface VoteTally {
   [playerId: string]: number;
 }
 
+/**
+ * Résultat COMBINÉ des deux tours de vote — rempli seulement une fois que
+ * TOUS les votes applicables sont clos (jamais entre les deux tours, pour ne
+ * rien dévoiler avant l'heure). `undercoverAccusedId`/`mrWhiteAccusedId`
+ * valent `null` en cas d'égalité (personne n'est désigné ce tour-là) — que
+ * la personne désignée ait effectivement le rôle correspondant ou non est à
+ * lire via `lastEliminatedRoles`.
+ */
+export interface VoteReveal {
+  undercoverAccusedId: string | null;
+  undercoverTally: VoteTally;
+  mrWhiteAccusedId: string | null;
+  /** null si Mr White est désactivé pour ce match (pas de second tour). */
+  mrWhiteTally: VoteTally | null;
+}
+
 export interface PublicRoomState {
   code: string;
   status: RoomStatus;
@@ -139,12 +155,13 @@ export interface PublicRoomState {
   currentTurnPlayerId: string | null;
   clues: MusicClue[];
   phaseDeadline: number | null; // epoch ms, null si timers désactivés
-  /** Éliminé·e·s par le vote de cette manche — plusieurs personnes possibles en une fois. */
+  /** Éliminé·e·s par les votes de cette manche (0 à 2 personnes : l'accusé infiltré et/ou l'accusé Mr White). */
   lastEliminatedPlayerIds: string[];
-  /** Rôle de chaque éliminé·e de cette manche, révélé dès l'élimination. */
+  /** Rôle RÉEL de chaque éliminé·e de cette manche, révélé une fois les deux votes clos. */
   lastEliminatedRoles: Record<string, Role>;
-  lastVoteTally: VoteTally | null;
-  /** Nombre de bulletins déjà reçus pendant la phase de vote en cours (le détail reste caché jusqu'au résultat). */
+  /** Rempli uniquement une fois les deux tours de vote clos (phase elimination et après) — jamais entre les deux tours. */
+  voteReveal: VoteReveal | null;
+  /** Nombre de bulletins déjà reçus pendant LE TOUR DE VOTE EN COURS (le détail reste cassé jusqu'à la révélation finale). */
   votesSubmittedCount: number;
   /** Nombre de joueurs prêts à passer au vote pendant la discussion. */
   discussionReadyCount: number;

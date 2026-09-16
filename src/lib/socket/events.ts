@@ -14,6 +14,8 @@ export const ClientEvents = {
   SUBMIT_MUSIC_URL: "music:submit_url",
   SUBMIT_VOTE: "vote:submit",
   DISCUSSION_READY: "discussion:ready",
+  SEND_PLAYBACK_CONTROL: "clue:control_send",
+  SKIP_CLUE_PLAYBACK: "clue:skip",
   HOST_ADVANCE_DISCUSSION: "host:advance_discussion",
   HOST_FORCE_NEXT_PHASE: "host:force_next_phase",
   HOST_REMOVE_PLAYER: "host:remove_player",
@@ -29,7 +31,7 @@ export const ServerEvents = {
   ROLE_SECRET: "role:secret",
   MUSIC_RESOLVING: "music:resolving",
   MUSIC_RESOLVE_ERROR: "music:resolve_error",
-  CLUE_PLAYBACK_STARTED: "clue:playback_started",
+  CLUE_CONTROL: "clue:control",
   JOINED: "session:joined"
 } as const;
 
@@ -43,9 +45,16 @@ export interface MusicResolveErrorPayload {
   reason: "unrecognized_link" | "not_found" | "embedding_disabled" | "provider_error" | "duplicate_track" | "not_your_turn";
 }
 
-export interface CluePlaybackStartedPayload {
-  clueId: string;
-  serverStartedAt: number;
+/**
+ * Watch2gether : la personne qui vient d'envoyer l'indice contrôle la
+ * lecture (lire/pause/déplacer) pour tout le monde. Diffusé par le serveur
+ * à toute la room à chaque action du contrôleur ; `serverTime` sert aux
+ * autres clients à compenser le petit délai réseau.
+ */
+export interface CluePlaybackControlPayload {
+  action: "play" | "pause";
+  positionSeconds: number;
+  serverTime: number;
 }
 
 export type { PrivatePlayerSecret, PublicRoomState };

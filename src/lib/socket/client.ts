@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { ClientEvents, ServerEvents, type MusicResolveErrorPayload, type CluePlaybackStartedPayload } from "./events";
+import { ClientEvents, ServerEvents, type MusicResolveErrorPayload, type CluePlaybackControlPayload } from "./events";
 import type { PrivatePlayerSecret, PublicRoomState, RoomSettings } from "@/types";
 
 const SESSION_STORAGE_KEY = "music-undercover:sessionId";
@@ -21,6 +21,9 @@ export type MusicResolutionStatus =
   | { state: "resolving" }
   | { state: "error"; reason: MusicResolveErrorPayload["reason"] };
 
+/** Watch2gether : dernier ordre de lecture reçu du contrôleur (celui qui vient d'envoyer l'indice), à appliquer sur son propre lecteur pour tous les autres joueurs. */
+export type PlaybackControlEvent = CluePlaybackControlPayload;
+
 interface UseGameSocketReturn {
   connected: boolean;
   sessionId: string;
@@ -30,7 +33,7 @@ interface UseGameSocketReturn {
   mySecret: PrivatePlayerSecret | null;
   errorMessage: string | null;
   musicResolution: MusicResolutionStatus;
-  cluePlayback: CluePlaybackStartedPayload | null;
+  playbackControl: PlaybackControlEvent | null;
   createRoom: (nickname: string, settings?: Partial<RoomSettings>) => void;
   joinRoom: (code: string, nickname: string) => void;
   setReady: (ready: boolean) => void;
@@ -39,7 +42,9 @@ interface UseGameSocketReturn {
   startGame: () => void;
   ackRoleReveal: () => void;
   submitMusicUrl: (url: string) => void;
-  submitVote: (targetIds: string[]) => void;
+  sendPlaybackControl: (action: "play" | "pause", positionSeconds: number) => void;
+  skipCluePlayback: () => void;
+  submitVote: (targetId: string) => void;
   markDiscussionReady: () => void;
   hostAdvanceDiscussion: () => void;
   hostForceNextPhase: () => void;
@@ -59,7 +64,7 @@ export function useGameSocket(): UseGameSocketReturn {
   const [mySecret, setMySecret] = useState<PrivatePlayerSecret | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [musicResolution, setMusicResolution] = useState<MusicResolutionStatus>({ state: "idle" });
-  const [cluePlayback, setCluePlayback] = useState<CluePlaybackStartedPayload | null>(null);
+  const [playbackControl, setPlaybackControl] = useState<PlaybackControlEvent | null>(null);
 
   useEffect(() => {
     const socket = io({ path: "/socket.io" });
@@ -81,6 +86,10 @@ export function useGameSocket(): UseGameSocketReturn {
     socket.on(ServerEvents.ROOM_STATE, (payload: PublicRoomState) => {
       setState(payload);
       if (payload.phase !== "waiting_for_music") setMusicResolution({ state: "idle" });
+      // Une commande de lecture n'a de sens que pour LA manche en cours — on
+      // l'efface dès qu'on quitte clue_playback pour éviter qu'un vieil
+      // ordre de lecture soit réappliqué par erreur au prochain indice.
+      if (payload.phase !== "clue_playback") setPlaybackControl(null);
     });
 
     socket.on(ServerEvents.ROLE_SECRET, (payload: PrivatePlayerSecret) => setMySecret(payload));
@@ -90,7 +99,7 @@ export function useGameSocket(): UseGameSocketReturn {
       setMusicResolution({ state: "error", reason: payload.reason })
     );
 
-    socket.on(ServerEvents.CLUE_PLAYBACK_STARTED, (payload: CluePlaybackStartedPayload) => setCluePlayback(payload));
+    socket.on(ServerEvents.CLUE_CONTROL, (payload: CluePlaybackControlPayload) => setPlaybackControl(payload));
 
     socket.on(ServerEvents.ROOM_ERROR, (payload: { message: string }) => setErrorMessage(payload.message));
 
@@ -113,7 +122,7 @@ export function useGameSocket(): UseGameSocketReturn {
     mySecret,
     errorMessage,
     musicResolution,
-    cluePlayback,
+    playbackControl,
     createRoom: (nickname, settings) => emit(ClientEvents.CREATE_ROOM, { nickname, sessionId, settings }),
     joinRoom: (code, nickname) => emit(ClientEvents.JOIN_ROOM, { code, nickname, sessionId }),
     setReady: (ready) => emit(ClientEvents.SET_READY, { ready }),
@@ -122,7 +131,9 @@ export function useGameSocket(): UseGameSocketReturn {
     startGame: () => emit(ClientEvents.START_GAME),
     ackRoleReveal: () => emit(ClientEvents.ACK_ROLE_REVEAL),
     submitMusicUrl: (url) => emit(ClientEvents.SUBMIT_MUSIC_URL, { url }),
-    submitVote: (targetIds) => emit(ClientEvents.SUBMIT_VOTE, { targetIds }),
+    sendPlaybackControl: (action, positionSeconds) => emit(ClientEvents.SEND_PLAYBACK_CONTROL, { action, positionSeconds }),
+    skipCluePlayback: () => emit(ClientEvents.SKIP_CLUE_PLAYBACK),
+    submitVote: (targetId) => emit(ClientEvents.SUBMIT_VOTE, { targetId }),
     markDiscussionReady: () => emit(ClientEvents.DISCUSSION_READY),
     hostAdvanceDiscussion: () => emit(ClientEvents.HOST_ADVANCE_DISCUSSION),
     hostForceNextPhase: () => emit(ClientEvents.HOST_FORCE_NEXT_PHASE),

@@ -26,6 +26,9 @@ function makeBus(io: Server, roomCode: string): EngineBus {
       const room = RoomStore.get(roomCode);
       const player = room?.players.get(playerId);
       if (player?.socketId) io.to(player.socketId).emit(event, payload);
+    },
+    broadcastToRoom(event, payload) {
+      io.to(roomCode).emit(event, payload);
     }
   };
   return bus;
@@ -84,13 +87,19 @@ export function attachSocketServer(io: Server): void {
     });
 
     socket.on(ClientEvents.REJOIN_SESSION, (payload: { sessionId: string }) => {
-      const link = RoomStore.resolveSession(payload.sessionId);
-      if (!link) return fail(socket, "Session inconnue.");
+      // Émis automatiquement et silencieusement à CHAQUE connexion (y
+      // compris la toute première visite d'un nouvel arrivant, qui n'a
+      // encore rejoint aucune salle) : un échec ici est donc normal et
+      // attendu la plupart du temps, pas une vraie erreur. On ne remonte
+      // jamais de message "Session inconnue" au client — ça ne veut rien
+      // dire pour quelqu'un qui vient d'arriver sur la page d'accueil.
+      const link = RoomStore.resolveSession(payload?.sessionId ?? "");
+      if (!link) return;
       const engine = engineFor(io, link.roomCode);
-      if (!engine) return fail(socket, "Cette salle n'existe plus.");
+      if (!engine) return;
 
       const result = engine.reconnectPlayer(link.playerId, socket.id);
-      if (!result.ok) return fail(socket, result.error);
+      if (!result.ok) return;
 
       data.sessionId = payload.sessionId;
       data.roomCode = link.roomCode;
@@ -170,10 +179,25 @@ export function attachSocketServer(io: Server): void {
       await engine?.submitMusicUrl(data.playerId, payload.url ?? "");
     });
 
-    socket.on(ClientEvents.SUBMIT_VOTE, (payload: { targetIds: string[] }) => {
+    socket.on(ClientEvents.SEND_PLAYBACK_CONTROL, (payload: { action: "play" | "pause"; positionSeconds: number }) => {
       if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
       const engine = engineFor(io, data.roomCode);
-      const result = engine?.submitVote(data.playerId, Array.isArray(payload?.targetIds) ? payload.targetIds : []);
+      const result = engine?.sendPlaybackControl(data.playerId, payload?.action, Number(payload?.positionSeconds) || 0);
+      if (result && !result.ok) fail(socket, result.error);
+    });
+
+    socket.on(
+      ClientEvents.SKIP_CLUE_PLAYBACK,
+      withEngine((engine, playerId) => {
+        const result = engine.skipCluePlayback(playerId);
+        if (!result.ok) fail(socket, result.error);
+      })
+    );
+
+    socket.on(ClientEvents.SUBMIT_VOTE, (payload: { targetId: string }) => {
+      if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
+      const engine = engineFor(io, data.roomCode);
+      const result = engine?.submitVote(data.playerId, String(payload?.targetId ?? ""));
       if (result && !result.ok) fail(socket, result.error);
     });
 

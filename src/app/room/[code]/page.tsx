@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Eye, EyeOff, Check } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { Avatar } from "@/components/Avatar";
@@ -83,10 +83,9 @@ function RoomByPhase(props: Props) {
       return <PhaseNextPlayer {...props} />;
     case "discussion":
       return <PhaseDiscussion {...props} />;
-    case "voting":
+    case "voting_undercover":
+    case "voting_mrwhite":
       return <PhaseVoting {...props} />;
-    case "vote_result":
-      return <PhaseVoteResult {...props} />;
     case "elimination":
       return <PhaseElimination {...props} />;
     case "round_result":
@@ -152,7 +151,6 @@ function PhaseLobby({ state, playerId, setReady, updateSettings, startGame, host
   const me = state.players.find((p) => p.id === playerId);
   const isHost = state.hostPlayerId === playerId;
   const [copied, setCopied] = useState(false);
-  const maxBadRoles = Math.max(1, state.players.length - 1);
 
   return (
     <PhaseShell
@@ -191,21 +189,6 @@ function PhaseLobby({ state, playerId, setReady, updateSettings, startGame, host
       {isHost && (
         <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-ink-border bg-ink-elevated p-4">
           <p className="text-sm font-medium text-paper">Paramètres de l&apos;hôte</p>
-
-          <label className="flex items-center justify-between text-sm">
-            <span>Nombre d&apos;infiltrés</span>
-            <select
-              value={Math.min(state.settings.undercoverCount, maxBadRoles)}
-              onChange={(e) => updateSettings({ undercoverCount: Number(e.target.value) })}
-              className="rounded-lg border border-ink-border bg-ink-raised px-2 py-1 text-sm text-paper"
-            >
-              {Array.from({ length: maxBadRoles }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <label className="flex items-center justify-between text-sm">
             <span>Mr White</span>
@@ -506,11 +489,15 @@ function TurnProgress({ state }: { state: Props["state"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// LECTURE DE L'INDICE — démarre automatiquement, sans clic (demande explicite)
+// LECTURE DE L'INDICE — démarre automatiquement, sans clic. Watch2gether :
+// la personne qui vient d'envoyer l'indice contrôle lecture/pause/défilement
+// pour tout le monde ; les autres suivent en lecture seule.
 // ---------------------------------------------------------------------------
-function PhaseCluePlayback({ state }: Props) {
+function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackControl, skipCluePlayback }: Props) {
   const clue = state.clues[state.clues.length - 1];
   const owner = state.players.find((p) => p.id === clue?.playerId);
+  const isController = !!clue && clue.playerId === playerId;
+  const [skipped, setSkipped] = useState(false);
   if (!clue) return <PhaseShell title="…" />;
 
   return (
@@ -524,7 +511,25 @@ function PhaseCluePlayback({ state }: Props) {
         thumbnailUrl={clue.thumbnailUrl}
         clipSeconds={clue.clipSeconds}
         autoPlay
+        isController={isController}
+        remoteControl={isController ? null : playbackControl}
+        onControl={isController ? (action, positionSeconds) => sendPlaybackControl(action, positionSeconds) : undefined}
       />
+      {isController ? (
+        <button
+          onClick={() => {
+            if (skipped) return;
+            setSkipped(true);
+            skipCluePlayback();
+          }}
+          disabled={skipped}
+          className="mt-3 w-full rounded-xl border border-ink-border py-2.5 text-center text-xs text-paper-muted hover:border-signal hover:text-signal disabled:opacity-50"
+        >
+          {skipped ? "Passage en cours…" : "Passer (bug ou musique horrible)"}
+        </button>
+      ) : (
+        <p className="mt-3 text-center text-xs text-paper-faint">{owner?.nickname ?? "Le joueur"} contrôle la lecture pour tout le monde.</p>
+      )}
     </PhaseShell>
   );
 }
@@ -623,6 +628,7 @@ function CluesReplayList({ state }: { state: Props["state"] }) {
                   thumbnailUrl={clue.thumbnailUrl}
                   clipSeconds={clue.clipSeconds}
                   autoPlay
+                  interactive
                 />
               </div>
             )}
@@ -634,41 +640,32 @@ function CluesReplayList({ state }: { state: Props["state"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// VOTE — plusieurs suspects possibles, plusieurs éliminations possibles.
-// Toute personne recevant la majorité absolue des votes est éliminée : plus
-// de second tour d'égalité, une seule salve de votes suffit même avec
-// plusieurs "méchants" en jeu.
+// VOTE — deux tours à cible UNIQUE (jamais plusieurs suspects à la fois,
+// pour éviter le n'importe quoi) : d'abord qui est l'infiltré, puis (si Mr
+// White est activé) qui est Mr White. Rien n'est révélé entre les deux tours
+// — le résultat combiné n'apparaît qu'à la phase suivante (elimination).
 // ---------------------------------------------------------------------------
 function PhaseVoting({ state, playerId, submitVote }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [votedFor, setVotedFor] = useState<string | null>(null);
   const [voteSent, setVoteSent] = useState(false);
   const alive = state.players.filter((p) => p.isAlive);
   const eligible = alive.filter((p) => p.id !== playerId);
-
-  function toggle(id: string) {
-    if (voteSent) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const isMrWhiteRound = state.phase === "voting_mrwhite";
 
   function castVote() {
-    if (voteSent) return;
-    submitVote([...selected]);
+    if (!votedFor || voteSent) return;
+    submitVote(votedFor);
     setVoteSent(true);
   }
 
   return (
     <PhaseShell
-      eyebrow="Vote"
-      title={voteSent ? "Vote envoyé ✓" : "Qui soupçonnes-tu ?"}
-      subtitle={voteSent ? undefined : "Coche un ou plusieurs suspects. La majorité absolue élimine."}
+      eyebrow={isMrWhiteRound ? "Vote — 2/2 : Mr White" : "Vote — 1/2 : l'infiltré"}
+      title={voteSent ? "Vote envoyé ✓" : isMrWhiteRound ? "Qui est Mr White ?" : "Qui est l'infiltré ?"}
+      subtitle={voteSent ? undefined : "Un seul suspect. Le résultat ne sera révélé qu'à la toute fin."}
       footer={
-        <Button fullWidth disabled={voteSent} onClick={castVote}>
-          {voteSent ? "Vote enregistré ✓" : selected.size === 0 ? "Voter pour personne" : `Voter (${selected.size})`}
+        <Button fullWidth disabled={!votedFor || voteSent} onClick={castVote}>
+          {voteSent ? "Vote enregistré ✓" : "Voter"}
         </Button>
       }
     >
@@ -678,28 +675,18 @@ function PhaseVoting({ state, playerId, submitVote }: Props) {
         </div>
       )}
       <div className={`flex flex-col gap-2 ${voteSent ? "pointer-events-none opacity-50" : ""}`}>
-        {eligible.map((p) => {
-          const checked = selected.has(p.id);
-          return (
-            <button
-              key={p.id}
-              onClick={() => toggle(p.id)}
-              className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-                checked ? "border-signal bg-signal-dim/40" : "border-ink-border bg-ink-elevated"
-              }`}
-            >
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-                  checked ? "border-signal bg-signal text-white" : "border-ink-border"
-                }`}
-              >
-                {checked && <Check size={14} />}
-              </span>
-              <Avatar emoji={p.avatar} size="sm" />
-              <span className="flex-1 text-sm">{p.nickname}</span>
-            </button>
-          );
-        })}
+        {eligible.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => !voteSent && setVotedFor(p.id)}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+              votedFor === p.id ? "border-signal bg-signal-dim/40" : "border-ink-border bg-ink-elevated"
+            }`}
+          >
+            <Avatar emoji={p.avatar} size="sm" />
+            <span className="flex-1 text-sm">{p.nickname}</span>
+          </button>
+        ))}
       </div>
       <p className="mt-4 text-center text-sm text-paper-faint">
         Votes reçus : {state.votesSubmittedCount} / {alive.length}
@@ -709,62 +696,99 @@ function PhaseVoting({ state, playerId, submitVote }: Props) {
   );
 }
 
-function PhaseVoteResult({ state }: Props) {
-  const tally = state.lastVoteTally ?? {};
-  const max = Math.max(1, ...Object.values(tally));
-  const eliminatedCount = state.lastEliminatedPlayerIds.length;
-  const shown = state.players.filter((p) => p.isAlive || state.lastEliminatedPlayerIds.includes(p.id));
+// ---------------------------------------------------------------------------
+// RÉVÉLATION — combine les deux tours de vote (jamais montrée avant que les
+// deux soient clos) : qui a été accusé d'être l'infiltré, qui a été accusé
+// d'être Mr White, si c'était juste ou faux, puis le rôle réel des
+// éliminé·e·s.
+// ---------------------------------------------------------------------------
+function PhaseElimination({ state }: Props) {
+  const reveal = state.voteReveal;
+  const eliminated = state.players.filter((p) => state.lastEliminatedPlayerIds.includes(p.id));
 
   return (
-    <PhaseShell eyebrow="Résultat" title={eliminatedCount > 0 ? "Le vote tombe…" : "Personne n'est éliminé"}>
-      <div className="flex flex-col gap-3">
-        {shown.map((p) => {
-          const eliminated = state.lastEliminatedPlayerIds.includes(p.id);
-          return (
-            <div key={p.id} className="flex items-center gap-3">
-              <Avatar emoji={p.avatar} size="sm" dimmed={eliminated} />
-              <span className="w-20 truncate text-sm">{p.nickname}</span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-border">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${eliminated ? "bg-signal" : "bg-wave"}`}
-                  style={{ width: `${((tally[p.id] ?? 0) / max) * 100}%` }}
-                />
-              </div>
-              <span className="w-4 text-right text-sm text-paper-muted">{tally[p.id] ?? 0}</span>
+    <PhaseShell title="Résultat du vote">
+      {reveal && (
+        <div className="mb-6 flex flex-col gap-4">
+          <VoteRoundResult
+            label="Tour 1 — désigné comme infiltré"
+            tally={reveal.undercoverTally}
+            accusedId={reveal.undercoverAccusedId}
+            players={state.players}
+            correct={reveal.undercoverAccusedId ? state.lastEliminatedRoles[reveal.undercoverAccusedId] === "undercover" : null}
+          />
+          {reveal.mrWhiteTally && (
+            <VoteRoundResult
+              label="Tour 2 — désigné comme Mr White"
+              tally={reveal.mrWhiteTally}
+              accusedId={reveal.mrWhiteAccusedId}
+              players={state.players}
+              correct={reveal.mrWhiteAccusedId ? state.lastEliminatedRoles[reveal.mrWhiteAccusedId] === "mrwhite" : null}
+            />
+          )}
+        </div>
+      )}
+
+      {eliminated.length === 0 ? (
+        <p className="text-center text-paper-muted">Personne n&apos;est éliminé ce tour-ci.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {eliminated.map((p) => (
+            <div key={p.id} className="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-border bg-ink-elevated p-5 text-center">
+              <Avatar emoji={p.avatar} size="lg" dimmed />
+              <p className="mt-1 text-sm text-paper">{p.nickname}</p>
+              <p className="text-xs text-paper-muted">était réellement…</p>
+              <p className="font-display text-xl text-signal">{ROLE_LABEL[state.lastEliminatedRoles[p.id]!]?.toUpperCase() ?? "…"}</p>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </PhaseShell>
   );
 }
 
-function PhaseElimination({ state }: Props) {
-  const eliminated = state.players.filter((p) => state.lastEliminatedPlayerIds.includes(p.id));
-
-  if (eliminated.length === 0) {
-    return (
-      <PhaseShell title="Personne n'est éliminé">
-        <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <p className="text-paper-muted">Le camp adverse s&apos;en sort cette manche.</p>
-        </div>
-      </PhaseShell>
-    );
-  }
+function VoteRoundResult({
+  label,
+  tally,
+  accusedId,
+  players,
+  correct
+}: {
+  label: string;
+  tally: Record<string, number>;
+  accusedId: string | null;
+  players: Props["state"]["players"];
+  correct: boolean | null;
+}) {
+  const max = Math.max(1, ...Object.values(tally));
+  const accused = players.find((p) => p.id === accusedId);
 
   return (
-    <PhaseShell title={eliminated.length === 1 ? `${eliminated[0]!.nickname} est éliminé` : `${eliminated.length} joueurs sont éliminés`}>
-      <div className="flex flex-col gap-3">
-        {eliminated.map((p) => (
-          <div key={p.id} className="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-border bg-ink-elevated p-5 text-center">
-            <Avatar emoji={p.avatar} size="lg" dimmed />
-            <p className="mt-1 text-sm text-paper">{p.nickname}</p>
-            <p className="text-xs text-paper-muted">était…</p>
-            <p className="font-display text-xl text-signal">{ROLE_LABEL[state.lastEliminatedRoles[p.id]!]?.toUpperCase() ?? "…"}</p>
-          </div>
-        ))}
+    <div className="rounded-2xl border border-ink-border bg-ink-elevated p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-paper-faint">{label}</p>
+      {!accused ? (
+        <p className="text-sm text-paper-muted">Égalité — personne n&apos;a été désigné.</p>
+      ) : (
+        <div className="mb-3 flex items-center gap-2">
+          <Avatar emoji={accused.avatar} size="sm" />
+          <span className="text-sm text-paper">{accused.nickname}</span>
+          <span className={`text-xs font-medium ${correct ? "text-wave" : "text-signal"}`}>{correct ? "✓ juste" : "✗ faux"}</span>
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        {players
+          .filter((p) => (tally[p.id] ?? 0) > 0)
+          .map((p) => (
+            <div key={p.id} className="flex items-center gap-2">
+              <span className="w-16 truncate text-xs text-paper-muted">{p.nickname}</span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-border">
+                <div className="h-full rounded-full bg-wave" style={{ width: `${((tally[p.id] ?? 0) / max) * 100}%` }} />
+              </div>
+              <span className="w-3 text-right text-xs text-paper-faint">{tally[p.id]}</span>
+            </div>
+          ))}
       </div>
-    </PhaseShell>
+    </div>
   );
 }
 

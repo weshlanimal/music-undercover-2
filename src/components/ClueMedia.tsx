@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { AudioPlayer } from "./AudioPlayer";
 import type { MusicProviderName } from "@/types";
+import type { PlaybackControlEvent } from "@/lib/socket/client";
 
 interface ClueMediaProps {
   provider: MusicProviderName;
@@ -14,22 +15,154 @@ interface ClueMediaProps {
   thumbnailUrl: string | null;
   clipSeconds: number;
   autoPlay?: boolean;
+  /** Affiche de vrais contrôles YouTube cliquables sur CE lecteur (réécoute libre, ou le contrôleur watch2gether). */
+  interactive?: boolean;
+  /** Watch2gether : cette instance EST le lecteur qui pilote tout le monde (celui qui vient d'envoyer l'indice) — implique interactive. */
+  isController?: boolean;
+  /** Watch2gether côté spectateur : dernier ordre reçu du contrôleur, à appliquer sur ce lecteur. */
+  remoteControl?: PlaybackControlEvent | null;
+  /** Watch2gether côté contrôleur : appelé à chaque lecture/pause pour diffuser aux autres. */
+  onControl?: (action: "play" | "pause", positionSeconds: number) => void;
 }
+
+// L'API JS YouTube (IFrame Player API) se charge une seule fois globalement
+// et notifie via window.onYouTubeIframeAPIReady — on mutualise ce chargement
+// entre tous les lecteurs de la page.
+let youTubeApiPromise: Promise<void> | null = null;
+function loadYouTubeIframeApi(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  const w = window as typeof window & { YT?: { Player: unknown }; onYouTubeIframeAPIReady?: () => void };
+  if (w.YT?.Player) return Promise.resolve();
+  if (youTubeApiPromise) return youTubeApiPromise;
+  youTubeApiPromise = new Promise((resolve) => {
+    const previous = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => {
+      previous?.();
+      resolve();
+    };
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(script);
+  });
+  return youTubeApiPromise;
+}
+
+// Typage minimal du player YT (pas de @types/youtube dans ce projet — juste ce qu'on utilise réellement).
+interface YTPlayer {
+  playVideo(): void;
+  pauseVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  getCurrentTime(): number;
+  getPlayerState(): number;
+  destroy(): void;
+}
+const YT_STATE_PLAYING = 1;
 
 /**
  * Contrairement à la version initiale du projet, rien n'est masqué ici :
- * titre et artiste sont affichés dès l'envoi de l'indice (choix demandé
- * explicitement — la découverte musicale prime sur l'anonymisation).
- * L'extrait YouTube est plafonné via les paramètres d'URL start/end du
- * lecteur officiel embarqué, quelle que soit la durée réelle de la vidéo.
+ * titre et artiste sont affichés dès l'envoi de l'indice. L'extrait YouTube
+ * est plafonné via les paramètres start/end du lecteur officiel embarqué.
  *
- * Quand autoPlay est demandé (l'écran "tout le monde écoute ensemble"), la
- * vidéo démarre directement sans clic supplémentaire — pas de vignette à
- * cliquer, pour ne pas perdre de temps d'écoute. Le bouton de lecture reste
- * utile pour la réécoute à la demande pendant la discussion.
+ * Watch2gether : pour un indice YouTube, seul le contrôleur (celui qui vient
+ * d'envoyer l'indice) a de vrais contrôles ; tout le monde d'autre a un
+ * lecteur en lecture seule qui suit ses lecture/pause en direct.
  */
-export function ClueMedia({ provider, videoId, audioUrl, title, artist, thumbnailUrl, clipSeconds, autoPlay }: ClueMediaProps) {
-  const [started, setStarted] = useState(!!autoPlay);
+export function ClueMedia({
+  provider,
+  videoId,
+  audioUrl,
+  title,
+  artist,
+  thumbnailUrl,
+  clipSeconds,
+  autoPlay,
+  interactive,
+  isController,
+  remoteControl,
+  onControl
+}: ClueMediaProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const lastAppliedServerTimeRef = useRef(0);
+  const [ready, setReady] = useState(false);
+  const [needsJoin, setNeedsJoin] = useState(false);
+  const [started, setStarted] = useState(!!autoPlay || !!isController);
+  const canInteract = !!interactive || !!isController;
+
+  const isYouTube = provider === "youtube" && !!videoId;
+
+  // Création du lecteur YouTube (une fois la vidéo affichée).
+  useEffect(() => {
+    if (!isYouTube || !started || !containerRef.current) return;
+    let cancelled = false;
+
+    loadYouTubeIframeApi().then(() => {
+      if (cancelled || !containerRef.current) return;
+      const YT = (window as unknown as { YT: { Player: new (el: HTMLElement, opts: unknown) => YTPlayer; PlayerState: Record<string, number> } }).YT;
+      playerRef.current = new YT.Player(containerRef.current, {
+        videoId,
+        playerVars: {
+          start: 0,
+          end: clipSeconds,
+          controls: canInteract ? 1 : 0,
+          disablekb: canInteract ? 0 : 1,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1
+        },
+        events: {
+          onReady: () => {
+            if (cancelled) return;
+            setReady(true);
+            if ((isController || autoPlay) && started) playerRef.current?.playVideo();
+          },
+          onStateChange: (e: { data: number }) => {
+            if (cancelled || !playerRef.current) return;
+            if (e.data === YT_STATE_PLAYING) setNeedsJoin(false);
+            if (isController) {
+              if (e.data === YT_STATE_PLAYING) onControl?.("play", playerRef.current.getCurrentTime());
+              else if (e.data === 2 /* paused */) onControl?.("pause", playerRef.current.getCurrentTime());
+            }
+          }
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYouTube, started, videoId]);
+
+  // Spectateur : applique les ordres de lecture reçus du contrôleur.
+  useEffect(() => {
+    if (isController || !remoteControl || !ready || !playerRef.current) return;
+    if (remoteControl.serverTime <= lastAppliedServerTimeRef.current) return;
+    lastAppliedServerTimeRef.current = remoteControl.serverTime;
+
+    const networkDelaySeconds = Math.max(0, (Date.now() - remoteControl.serverTime) / 1000);
+    const target = remoteControl.positionSeconds + (remoteControl.action === "play" ? networkDelaySeconds : 0);
+    playerRef.current.seekTo(target, true);
+
+    if (remoteControl.action === "play") {
+      playerRef.current.playVideo();
+      // Les navigateurs bloquent parfois la lecture avec le son déclenchée
+      // par un événement réseau (pas un vrai clic) : si ça n'a pas démarré
+      // après un court instant, on propose de rejoindre manuellement.
+      setTimeout(() => {
+        if (playerRef.current?.getPlayerState() !== YT_STATE_PLAYING) setNeedsJoin(true);
+      }, 900);
+    } else {
+      playerRef.current.pauseVideo();
+    }
+  }, [remoteControl, isController, ready]);
+
+  function joinPlayback() {
+    playerRef.current?.playVideo();
+    setNeedsJoin(false);
+  }
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-ink-border bg-ink-elevated">
@@ -38,16 +171,18 @@ export function ClueMedia({ provider, videoId, audioUrl, title, artist, thumbnai
         <p className="text-sm text-paper-muted">{artist}</p>
       </div>
 
-      {provider === "youtube" && videoId ? (
+      {isYouTube ? (
         started ? (
-          <div className="aspect-video w-full bg-black">
-            <iframe
-              className="h-full w-full"
-              src={`https://www.youtube.com/embed/${videoId}?start=0&end=${clipSeconds}&autoplay=1&rel=0&modestbranding=1`}
-              title={title}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-            />
+          <div className="relative aspect-video w-full bg-black">
+            <div ref={containerRef} className={`h-full w-full ${canInteract ? "" : "pointer-events-none"}`} />
+            {needsJoin && (
+              <button
+                onClick={joinPlayback}
+                className="absolute inset-0 flex items-center justify-center bg-black/70 text-sm font-medium text-white"
+              >
+                🔊 Rejoindre la lecture
+              </button>
+            )}
           </div>
         ) : (
           <button onClick={() => setStarted(true)} className="group relative block aspect-video w-full bg-black" aria-label="Lire l'extrait">
@@ -70,7 +205,9 @@ export function ClueMedia({ provider, videoId, audioUrl, title, artist, thumbnai
         <p className="px-4 pb-4 text-sm text-paper-faint">Média indisponible.</p>
       )}
 
-      <p className="px-4 pb-3 pt-2 text-center text-xs text-paper-faint">Extrait limité à {clipSeconds}s</p>
+      <p className="px-4 pb-3 pt-2 text-center text-xs text-paper-faint">
+        {isYouTube && isController ? `Tu contrôles la lecture pour tout le monde · plafonné à ${clipSeconds}s` : `Extrait limité à ${clipSeconds}s`}
+      </p>
     </div>
   );
 }

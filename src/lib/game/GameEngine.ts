@@ -1,4 +1,5 @@
 import type {
+  GamePhase,
   MusicClue,
   PrivatePlayerSecret,
   PublicPlayer,
@@ -8,6 +9,7 @@ import type {
   RoomReveal,
   RoomSettings,
   ThemePair,
+  VoteReveal,
   VoteTally
 } from "@/types";
 import { DEFAULT_ROOM_SETTINGS } from "@/types";
@@ -25,8 +27,10 @@ import { RoomStore } from "./RoomStore";
 //
 // Un MATCH enchaîne plusieurs MANCHES (thème + rôles neufs à chaque fois,
 // tout le monde revit) jusqu'à ce qu'un·e joueur·se atteigne le score cible
-// configuré par l'hôte. Rôles configurables (nombre d'infiltrés, Mr White),
-// et le vote de fin de manche peut éliminer plusieurs joueurs à la fois.
+// configuré par l'hôte. Toujours EXACTEMENT UN infiltré ; Mr White optionnel.
+// Le vote de fin de manche se déroule en DEUX tours à cible unique (jamais
+// plusieurs suspects à la fois) : d'abord qui est l'infiltré, puis (si Mr
+// White est activé) qui est Mr White — sans rien révéler entre les deux tours.
 // ---------------------------------------------------------------------------
 
 const MIN_PLAYERS_TO_START = 3;
@@ -41,6 +45,8 @@ export interface EngineBus {
   broadcastState(room: ServerRoom): void;
   /** Envoie un message privé (secret de rôle, statut de résolution musicale, etc.) à un seul joueur. */
   sendToPlayer(playerId: string, event: string, payload: unknown): void;
+  /** Diffuse un événement ponctuel (pas l'état complet) à toute la room — utilisé pour la synchro lecture "watch2gether". */
+  broadcastToRoom(event: string, payload: unknown): void;
 }
 
 function trackKey(track: Pick<ResolvedTrack, "provider" | "providerTrackId">): string {
@@ -155,7 +161,6 @@ export class GameEngine {
     room.settings = { ...room.settings, ...patch, timers: { ...room.settings.timers, ...(patch.timers ?? {}) } };
     // Bornes de sécurité, appliquées immédiatement pour que le lobby affiche des valeurs cohérentes.
     room.settings.maxPlayers = Math.min(16, Math.max(3, Math.round(room.settings.maxPlayers)));
-    room.settings.undercoverCount = Math.max(1, Math.round(room.settings.undercoverCount));
     room.settings.targetScore = Math.max(1, Math.round(room.settings.targetScore));
     this.bus.broadcastState(room);
     return { ok: true, value: undefined };
@@ -212,7 +217,7 @@ export class GameEngine {
     // manuellement la suite (host:force_next_phase) en cas de blocage.
   }
 
-  /** Un seul infiltré par défaut, configurable ; Mr White optionnel ; le reste civils. */
+  /** Toujours exactement un infiltré ; Mr White optionnel ; le reste civils. */
   private assignRolesAndThemes(): void {
     const room = this.room;
     const pool = room.settings.themeSource === "custom" && room.customThemePairs.length > 0 ? room.customThemePairs : OFFICIAL_THEMES;
@@ -221,16 +226,8 @@ export class GameEngine {
 
     const players = shuffle([...room.players.values()]);
     const mrWhiteCount = room.settings.mrWhiteEnabled ? 1 : 0;
-    const maxBad = Math.max(1, players.length - 1); // laisse au moins 1 civil quand c'est possible
-    let undercoverCount = Math.max(1, room.settings.undercoverCount);
-    if (undercoverCount + mrWhiteCount > maxBad) {
-      undercoverCount = Math.max(1, maxBad - mrWhiteCount);
-    }
 
-    const roles: Role[] = [
-      ...Array(undercoverCount).fill("undercover" as const),
-      ...Array(mrWhiteCount).fill("mrwhite" as const)
-    ];
+    const roles: Role[] = ["undercover", ...Array(mrWhiteCount).fill("mrwhite" as const)];
     while (roles.length < players.length) roles.push("civil");
 
     const shuffledRoles = shuffle(roles);
@@ -370,11 +367,45 @@ export class GameEngine {
     room.phase = "clue_playback";
     room.phaseDeadline = Date.now() + clipSeconds * 1000 + 400;
     this.bus.broadcastState(room);
-    this.bus.sendToPlayer(player.id, "clue:playback_started", {
-      clueId,
-      serverStartedAt: Date.now()
-    });
     this.scheduleTimeout(clipSeconds * 1000 + 400, () => this.advanceToNextTurnOrDiscussion());
+  }
+
+  /**
+   * Watch2gether : seule la personne qui vient d'envoyer l'indice de la
+   * manche en cours peut contrôler la lecture (lire/pause/déplacer) — son
+   * geste est diffusé à toute la room pour que tout le monde reste
+   * synchronisé sur le même instant.
+   */
+  sendPlaybackControl(playerId: string, action: "play" | "pause", positionSeconds: number): EngineResult {
+    const room = this.room;
+    if (room.phase !== "clue_playback") return { ok: false, error: "Pas de lecture en cours." };
+    const clue = room.currentRoundClues[room.currentRoundClues.length - 1];
+    if (!clue || clue.playerId !== playerId) {
+      return { ok: false, error: "Seule la personne qui a envoyé cet indice peut contrôler la lecture." };
+    }
+    this.bus.broadcastToRoom("clue:control", {
+      action,
+      positionSeconds: Math.max(0, positionSeconds),
+      serverTime: Date.now()
+    });
+    return { ok: true, value: undefined };
+  }
+
+  /**
+   * Bouton "Passer" : réservé à la personne qui vient d'envoyer l'indice en
+   * cours de lecture (le "maître du lecteur"), pour les cas de bug ou de
+   * musique vraiment ratée — évite d'attendre la fin du minuteur.
+   */
+  skipCluePlayback(playerId: string): EngineResult {
+    const room = this.room;
+    if (room.phase !== "clue_playback") return { ok: false, error: "Pas de lecture en cours." };
+    const clue = room.currentRoundClues[room.currentRoundClues.length - 1];
+    if (!clue || clue.playerId !== playerId) {
+      return { ok: false, error: "Seule la personne qui a envoyé cet indice peut le passer." };
+    }
+    this.clearTimer();
+    this.advanceToNextTurnOrDiscussion();
+    return { ok: true, value: undefined };
   }
 
   private advanceToNextTurnOrDiscussion(): void {
@@ -399,7 +430,7 @@ export class GameEngine {
     this.bus.broadcastState(room);
     // Plafond dur à 5 minutes (ou la valeur configurée) : filet de sécurité
     // si tout le monde ne clique pas "Passer au vote".
-    this.scheduleDeadline(room.phaseDeadline, () => this.beginVoting());
+    this.scheduleDeadline(room.phaseDeadline, () => this.beginVotingUndercover());
   }
 
   /** Chaque joueur clique "Passer au vote" ; le vote démarre dès que tout le monde vivant l'a fait. */
@@ -412,7 +443,7 @@ export class GameEngine {
     const alivePlayers = [...room.players.values()].filter((p) => p.isAlive && p.connected);
     if (alivePlayers.every((p) => p.isReady)) {
       this.clearTimer();
-      this.beginVoting();
+      this.beginVotingUndercover();
     }
   }
 
@@ -420,60 +451,99 @@ export class GameEngine {
     if (this.room.hostPlayerId !== hostId) return { ok: false, error: "Seul l'hôte peut passer cette phase." };
     if (this.room.phase !== "discussion") return { ok: false, error: "Pas en phase de discussion." };
     this.clearTimer();
-    this.beginVoting();
+    this.beginVotingUndercover();
     return { ok: true, value: undefined };
   }
 
-  // ---- Vote — plusieurs suspects possibles, plusieurs éliminations possibles --
+  // ---- Vote — deux tours à cible unique : d'abord l'infiltré, puis Mr White
+  // (si activé), sans rien révéler entre les deux. Un seul suspect par
+  // bulletin, pour éviter le n'importe quoi. -------------------------------
 
-  private beginVoting(): void {
+  private beginVotingUndercover(): void {
     const room = this.room;
     room.votes = new Map();
-    room.phase = "voting";
+    room.undercoverAccusedId = null;
+    room.undercoverTally = null;
+    room.mrWhiteAccusedId = null;
+    room.mrWhiteTally = null;
+    room.phase = "voting_undercover";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.voteSeconds * 1000 : null;
     this.bus.broadcastState(room);
-    this.scheduleDeadline(room.phaseDeadline, () => this.resolveVotes());
+    this.scheduleDeadline(room.phaseDeadline, () => this.resolveCurrentVote());
   }
 
-  /** @param targetIds Un ou plusieurs suspects cochés ; tableau vide autorisé (abstention). */
-  submitVote(voterId: string, targetIds: string[]): EngineResult {
+  private beginVotingMrWhite(): void {
     const room = this.room;
-    if (room.phase !== "voting") return { ok: false, error: "Ce n'est pas le moment de voter." };
+    room.votes = new Map();
+    room.phase = "voting_mrwhite";
+    room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.voteSeconds * 1000 : null;
+    this.bus.broadcastState(room);
+    this.scheduleDeadline(room.phaseDeadline, () => this.resolveCurrentVote());
+  }
+
+  /** @param targetId Un seul suspect — jamais plusieurs à la fois. */
+  submitVote(voterId: string, targetId: string): EngineResult {
+    const room = this.room;
+    if (room.phase !== "voting_undercover" && room.phase !== "voting_mrwhite") {
+      return { ok: false, error: "Ce n'est pas le moment de voter." };
+    }
     const voter = room.players.get(voterId);
     if (!voter || !voter.isAlive) return { ok: false, error: "Tu ne peux pas voter." };
+    if (voterId === targetId) return { ok: false, error: "Impossible de voter pour toi-même." };
+    const target = room.players.get(targetId);
+    if (!target || !target.isAlive) return { ok: false, error: "Cible invalide." };
 
-    const uniqueTargets = new Set(targetIds);
-    if (uniqueTargets.has(voterId)) return { ok: false, error: "Impossible de voter pour toi-même." };
-    for (const targetId of uniqueTargets) {
-      const target = room.players.get(targetId);
-      if (!target || !target.isAlive) return { ok: false, error: "Cible invalide." };
-    }
-
-    room.votes.set(voterId, uniqueTargets);
+    room.votes.set(voterId, targetId);
     // Le NOMBRE de bulletins reçus est public en direct (votesSubmittedCount),
-    // mais jamais le détail (qui a voté pour qui) avant la résolution.
+    // mais jamais le détail (qui a voté pour qui) avant la révélation finale
+    // — qui n'arrive qu'après les DEUX tours (voir finalizeVotingResults).
     this.bus.broadcastState(room);
 
     const aliveCount = [...room.players.values()].filter((p) => p.isAlive).length;
     if (room.votes.size >= aliveCount) {
       this.clearTimer();
-      this.resolveVotes();
+      this.resolveCurrentVote();
     }
     return { ok: true, value: undefined };
   }
 
-  private resolveVotes(): void {
-    const room = this.room;
+  private tallyCurrentVotes(): VoteTally {
     const tally: VoteTally = {};
-    for (const targets of room.votes.values()) {
-      for (const targetId of targets) {
-        tally[targetId] = (tally[targetId] ?? 0) + 1;
-      }
+    for (const targetId of this.room.votes.values()) {
+      tally[targetId] = (tally[targetId] ?? 0) + 1;
     }
-    room.lastVoteTally = tally;
+    return tally;
+  }
 
-    const aliveCount = [...room.players.values()].filter((p) => p.isAlive).length;
-    const eliminatedIds = GameRules.resolveMajority(tally, aliveCount);
+  private resolveCurrentVote(): void {
+    const room = this.room;
+    const tally = this.tallyCurrentVotes();
+    const accusedId = GameRules.resolvePluralityWinner(tally);
+
+    if (room.phase === "voting_undercover") {
+      room.undercoverTally = tally;
+      room.undercoverAccusedId = accusedId;
+      // Résultat gardé strictement côté serveur : on enchaîne directement
+      // sur le second tour (ou la révélation s'il n'y en a pas) sans jamais
+      // exposer `undercoverTally`/`undercoverAccusedId` au client ici.
+      if (room.settings.mrWhiteEnabled) {
+        this.beginVotingMrWhite();
+      } else {
+        this.finalizeVotingResults();
+      }
+      return;
+    }
+
+    // room.phase === "voting_mrwhite"
+    room.mrWhiteTally = tally;
+    room.mrWhiteAccusedId = accusedId;
+    this.finalizeVotingResults();
+  }
+
+  /** Révélation combinée des deux tours — jamais avant que les deux soient clos. */
+  private finalizeVotingResults(): void {
+    const room = this.room;
+    const eliminatedIds = [...new Set([room.undercoverAccusedId, room.mrWhiteAccusedId].filter((id): id is string => !!id))];
 
     room.lastEliminatedPlayerIds = eliminatedIds;
     room.lastEliminatedRoles = {};
@@ -485,16 +555,9 @@ export class GameEngine {
       }
     }
 
-    room.phase = "vote_result";
-    this.bus.broadcastState(room);
-    this.scheduleTimeout(3_000, () => this.showElimination());
-  }
-
-  private showElimination(): void {
-    const room = this.room;
     room.phase = "elimination";
     this.bus.broadcastState(room);
-    this.scheduleTimeout(2_500, () => this.concludeRound());
+    this.scheduleTimeout(4_000, () => this.concludeRound());
   }
 
   // ---- Fin de manche — score, puis manche suivante ou fin du match -----------
@@ -586,10 +649,11 @@ export class GameEngine {
         this.advanceToNextTurnOrDiscussion();
         break;
       case "discussion":
-        this.beginVoting();
+        this.beginVotingUndercover();
         break;
-      case "voting":
-        this.resolveVotes();
+      case "voting_undercover":
+      case "voting_mrwhite":
+        this.resolveCurrentVote();
         break;
       default:
         return { ok: false, error: "Cette phase ne peut pas être forcée." };
@@ -639,7 +703,10 @@ export class GameEngine {
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
     room.votes = new Map();
-    room.lastVoteTally = null;
+    room.undercoverAccusedId = null;
+    room.undercoverTally = null;
+    room.mrWhiteAccusedId = null;
+    room.mrWhiteTally = null;
     room.lastEliminatedPlayerIds = [];
     room.lastEliminatedRoles = {};
     room.matchWinnerIds = null;
@@ -696,6 +763,21 @@ export class GameEngine {
       reveal = { roles, clues: room.currentRoundClues };
     }
 
+    // La révélation du vote ne sort JAMAIS avant que les deux tours soient
+    // clos (phase "elimination" ou plus tard) — jamais pendant les votes
+    // eux-mêmes, même si le 1er tour est déjà résolu côté serveur.
+    const votingPhases: GamePhase[] = ["voting_undercover", "voting_mrwhite"];
+    const canRevealVotes = !votingPhases.includes(room.phase) && room.phase !== "discussion" && room.phase !== "round_start";
+    const voteReveal: VoteReveal | null =
+      canRevealVotes && room.undercoverTally
+        ? {
+            undercoverAccusedId: room.undercoverAccusedId,
+            undercoverTally: room.undercoverTally,
+            mrWhiteAccusedId: room.mrWhiteAccusedId,
+            mrWhiteTally: room.mrWhiteTally
+          }
+        : null;
+
     const alivePlayers = [...room.players.values()].filter((p) => p.isAlive && p.connected);
     const discussionReadyCount = room.phase === "discussion" ? alivePlayers.filter((p) => p.isReady).length : 0;
 
@@ -713,7 +795,7 @@ export class GameEngine {
       phaseDeadline: room.phaseDeadline,
       lastEliminatedPlayerIds: room.lastEliminatedPlayerIds,
       lastEliminatedRoles: room.lastEliminatedRoles,
-      lastVoteTally: room.phase === "vote_result" || room.phase === "elimination" || room.phase === "round_result" || room.status === "finished" ? room.lastVoteTally : null,
+      voteReveal,
       votesSubmittedCount: room.votes.size,
       discussionReadyCount,
       lastRoundRoles: room.lastRoundRoles,

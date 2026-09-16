@@ -21,24 +21,20 @@ describe("GameRules.pointsFor — points strictement individuels", () => {
   });
 });
 
-describe("GameRules.resolveMajority", () => {
-  it("élimine un seul joueur s'il est seul à dépasser la majorité absolue", () => {
-    // 5 joueurs vivants -> majorité absolue = 3
-    expect(GameRules.resolveMajority({ a: 3, b: 1 }, 5)).toEqual(["a"]);
+describe("GameRules.resolvePluralityWinner — un seul suspect par tour de vote", () => {
+  it("désigne le joueur ayant reçu le plus de votes", () => {
+    expect(GameRules.resolvePluralityWinner({ a: 3, b: 1 })).toBe("a");
   });
 
-  it("peut éliminer plusieurs joueurs à la fois s'ils dépassent tous la majorité", () => {
-    // 6 joueurs vivants -> majorité absolue = 4
-    const result = GameRules.resolveMajority({ a: 4, b: 4, c: 1 }, 6);
-    expect(result.sort()).toEqual(["a", "b"]);
+  it("ne désigne personne en cas d'égalité au sommet", () => {
+    expect(GameRules.resolvePluralityWinner({ a: 2, b: 2, c: 1 })).toBeNull();
   });
 
-  it("n'élimine personne si personne n'atteint la majorité absolue", () => {
-    // 6 joueurs vivants -> majorité absolue = 4, personne n'atteint 4
-    expect(GameRules.resolveMajority({ a: 3, b: 2 }, 6)).toEqual([]);
+  it("ne désigne personne si personne n'a voté", () => {
+    expect(GameRules.resolvePluralityWinner({})).toBeNull();
   });
 
-  it("renvoie un tableau vide si personne n'a voté", () => {
-    expect(GameRules.resolveMajority({}, 5)).toEqual([]);
+  it("fonctionne avec un seul candidat", () => {
+    expect(GameRules.resolvePluralityWinner({ a: 1 })).toBe("a");
   });
 });

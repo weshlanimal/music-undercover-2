@@ -38,9 +38,14 @@ export interface ServerRoom {
   turnOrder: string[];
   currentTurnIndex: number;
   currentRoundClues: MusicClue[];
-  /** voterId -> ensemble des cibles cochées (vote multiple). */
-  votes: Map<string, Set<string>>;
-  lastVoteTally: VoteTally | null;
+  /** voterId -> cible UNIQUE, réutilisé pour le tour de vote actif (infiltré, puis Mr White). */
+  votes: Map<string, string>;
+  /** Résultat du 1er tour (qui est l'infiltré ?), gardé secret côté serveur jusqu'à la révélation combinée finale. */
+  undercoverAccusedId: string | null;
+  undercoverTally: VoteTally | null;
+  /** Résultat du 2e tour (qui est Mr White ?), le cas échéant. */
+  mrWhiteAccusedId: string | null;
+  mrWhiteTally: VoteTally | null;
   lastEliminatedPlayerIds: string[];
   lastEliminatedRoles: Record<string, Role>;
   lastRoundRoles: Record<string, Role>;
@@ -66,7 +71,10 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     currentTurnIndex: 0,
     currentRoundClues: [],
     votes: new Map(),
-    lastVoteTally: null,
+    undercoverAccusedId: null,
+    undercoverTally: null,
+    mrWhiteAccusedId: null,
+    mrWhiteTally: null,
     lastEliminatedPlayerIds: [],
     lastEliminatedRoles: {},
     lastRoundRoles: {},
