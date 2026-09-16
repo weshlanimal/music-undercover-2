@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-image: radial-gradient(120% 90% at 50% -10%, rgba(255, 61, 119, 0.16), transparent 60%),
+      radial-gradient(90% 70% at 90% 110%, rgba(79, 214, 192, 0.12), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.wave.DEFAULT");
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: theme("colors.signal.DEFAULT");
+    color: theme("colors.ink.DEFAULT");
+  }
+}
+
+@layer utilities {
+  .font-display {
+    letter-spacing: -0.01em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
