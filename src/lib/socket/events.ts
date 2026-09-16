@@ -16,6 +16,9 @@ export const ClientEvents = {
   DISCUSSION_READY: "discussion:ready",
   SEND_PLAYBACK_CONTROL: "clue:control_send",
   SKIP_CLUE_PLAYBACK: "clue:skip",
+  SEND_REACTION: "reaction:send",
+  SUBMIT_MRWHITE_GUESS: "mrwhite:submit_guess",
+  HOST_VALIDATE_MRWHITE_GUESS: "host:validate_mrwhite_guess",
   HOST_ADVANCE_DISCUSSION: "host:advance_discussion",
   HOST_FORCE_NEXT_PHASE: "host:force_next_phase",
   HOST_REMOVE_PLAYER: "host:remove_player",
@@ -32,6 +35,7 @@ export const ServerEvents = {
   MUSIC_RESOLVING: "music:resolving",
   MUSIC_RESOLVE_ERROR: "music:resolve_error",
   CLUE_CONTROL: "clue:control",
+  REACTION: "reaction:receive",
   JOINED: "session:joined"
 } as const;
 
@@ -55,6 +59,12 @@ export interface CluePlaybackControlPayload {
   action: "play" | "pause";
   positionSeconds: number;
   serverTime: number;
+}
+
+/** Réaction emoji éphémère ("emote spam" façon Twitch) diffusée à toute la room pendant l'écoute. */
+export interface ReactionPayload {
+  id: string;
+  emoji: string;
 }
 
 export type { PrivatePlayerSecret, PublicRoomState };

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { ClientEvents, ServerEvents, type MusicResolveErrorPayload, type CluePlaybackControlPayload } from "./events";
+import { ClientEvents, ServerEvents, type MusicResolveErrorPayload, type CluePlaybackControlPayload, type ReactionPayload } from "./events";
 import type { PrivatePlayerSecret, PublicRoomState, RoomSettings } from "@/types";
 
 const SESSION_STORAGE_KEY = "music-undercover:sessionId";
@@ -24,6 +24,9 @@ export type MusicResolutionStatus =
 /** Watch2gether : dernier ordre de lecture reçu du contrôleur (celui qui vient d'envoyer l'indice), à appliquer sur son propre lecteur pour tous les autres joueurs. */
 export type PlaybackControlEvent = CluePlaybackControlPayload;
 
+/** Une réaction emoji reçue, encore affichée à l'écran (retirée dès que son animation se termine). */
+export type ActiveReaction = ReactionPayload;
+
 interface UseGameSocketReturn {
   connected: boolean;
   sessionId: string;
@@ -34,6 +37,7 @@ interface UseGameSocketReturn {
   errorMessage: string | null;
   musicResolution: MusicResolutionStatus;
   playbackControl: PlaybackControlEvent | null;
+  reactions: ActiveReaction[];
   createRoom: (nickname: string, settings?: Partial<RoomSettings>) => void;
   joinRoom: (code: string, nickname: string) => void;
   setReady: (ready: boolean) => void;
@@ -44,6 +48,11 @@ interface UseGameSocketReturn {
   submitMusicUrl: (url: string) => void;
   sendPlaybackControl: (action: "play" | "pause", positionSeconds: number) => void;
   skipCluePlayback: () => void;
+  sendReaction: (emoji: string) => void;
+  /** À appeler par l'UI une fois l'animation d'une réaction terminée, pour la retirer de la liste. */
+  removeReaction: (id: string) => void;
+  submitMrWhiteGuess: (guess: string) => void;
+  hostValidateMrWhiteGuess: (correct: boolean) => void;
   submitVote: (targetId: string) => void;
   markDiscussionReady: () => void;
   hostAdvanceDiscussion: () => void;
@@ -65,6 +74,7 @@ export function useGameSocket(): UseGameSocketReturn {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [musicResolution, setMusicResolution] = useState<MusicResolutionStatus>({ state: "idle" });
   const [playbackControl, setPlaybackControl] = useState<PlaybackControlEvent | null>(null);
+  const [reactions, setReactions] = useState<ActiveReaction[]>([]);
 
   useEffect(() => {
     const socket = io({ path: "/socket.io" });
@@ -101,6 +111,10 @@ export function useGameSocket(): UseGameSocketReturn {
 
     socket.on(ServerEvents.CLUE_CONTROL, (payload: CluePlaybackControlPayload) => setPlaybackControl(payload));
 
+    // Réactions emoji ("emote spam" façon Twitch) : purement éphémères, on
+    // les accumule et l'UI les retire elle-même une fois animées (removeReaction).
+    socket.on(ServerEvents.REACTION, (payload: ReactionPayload) => setReactions((prev) => [...prev, payload]));
+
     socket.on(ServerEvents.ROOM_ERROR, (payload: { message: string }) => setErrorMessage(payload.message));
 
     return () => {
@@ -123,6 +137,7 @@ export function useGameSocket(): UseGameSocketReturn {
     errorMessage,
     musicResolution,
     playbackControl,
+    reactions,
     createRoom: (nickname, settings) => emit(ClientEvents.CREATE_ROOM, { nickname, sessionId, settings }),
     joinRoom: (code, nickname) => emit(ClientEvents.JOIN_ROOM, { code, nickname, sessionId }),
     setReady: (ready) => emit(ClientEvents.SET_READY, { ready }),
@@ -133,6 +148,10 @@ export function useGameSocket(): UseGameSocketReturn {
     submitMusicUrl: (url) => emit(ClientEvents.SUBMIT_MUSIC_URL, { url }),
     sendPlaybackControl: (action, positionSeconds) => emit(ClientEvents.SEND_PLAYBACK_CONTROL, { action, positionSeconds }),
     skipCluePlayback: () => emit(ClientEvents.SKIP_CLUE_PLAYBACK),
+    sendReaction: (emoji) => emit(ClientEvents.SEND_REACTION, { emoji }),
+    removeReaction: (id) => setReactions((prev) => prev.filter((r) => r.id !== id)),
+    submitMrWhiteGuess: (guess) => emit(ClientEvents.SUBMIT_MRWHITE_GUESS, { guess }),
+    hostValidateMrWhiteGuess: (correct) => emit(ClientEvents.HOST_VALIDATE_MRWHITE_GUESS, { correct }),
     submitVote: (targetId) => emit(ClientEvents.SUBMIT_VOTE, { targetId }),
     markDiscussionReady: () => emit(ClientEvents.DISCUSSION_READY),
     hostAdvanceDiscussion: () => emit(ClientEvents.HOST_ADVANCE_DISCUSSION),

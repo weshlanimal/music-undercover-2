@@ -21,21 +21,23 @@ Fonctionne immédiatement avec de vrais liens **YouTube** — aucune clé API n'
 ## Règles du jeu (résumé)
 
 - **Toujours exactement un infiltré.** Mr White est optionnel (activable par l'hôte) — il n'a aucun thème du tout et doit bluffer. Le reste des joueurs est civil.
+- **Dernière chance de Mr White.** S'il est démasqué par le second tour de vote, il a une chance de deviner le thème des civils avant que la manche ne se conclue. S'il trouve, il compte comme s'il n'avait jamais été éliminé (mêmes points que s'il avait survécu) ; sinon il reste éliminé. L'hôte peut aussi valider manuellement (utile si la réponse est annoncée à voix haute plutôt que tapée).
 - **Personne ne connaît son propre rôle**, à part Mr White qui le devine forcément puisqu'il ne reçoit aucun thème (impossible de cacher une absence totale d'information à celui qui la reçoit). Civil et infiltré reçoivent exactement le même type de message — un thème, sans étiquette.
 - **Une manche = un thème, un tour de musique par joueur, une discussion (5 min max, tout le monde doit cliquer "Passer au vote"), puis le vote.**
 - **Le vote se déroule en un ou deux tours à cible UNIQUE** (jamais plusieurs suspects à la fois, pour éviter le n'importe quoi) : d'abord "qui est l'infiltré ?", puis — si Mr White est activé — "qui est Mr White ?", **sans rien révéler du premier tour avant la fin du second**. Le résultat des deux tours n'apparaît qu'une fois combiné, à la toute fin.
 - **Lecture synchronisée façon Watch2gether** : la personne qui vient d'envoyer son indice contrôle lecture/pause/défilement pour tout le monde — les autres joueurs regardent en lecture seule, synchronisés en direct. Elle peut aussi passer directement à la suite ("Passer") en cas de bug ou de musique ratée. **Le volume, lui, reste toujours personnel** : chaque joueur règle le sien indépendamment, y compris les spectateurs dont la vidéo est par ailleurs verrouillée.
+- **Réactions emoji en direct pendant l'écoute** (façon "emote spam" Twitch) : n'importe quel joueur peut taper un emoji parmi une liste fermée, qui monte et disparaît sur l'écran de tout le monde. Pas de texte libre, pas de chat — juste une réaction instantanée.
 - **Points strictement individuels** : infiltré et Mr White ne forment PAS une équipe entre eux. Chaque joueur qui survit au(x) vote(s) gagne des points selon son propre rôle (civil : +1, infiltré ou Mr White : +2) ; un joueur démasqué gagne 0, peu importe le sort de l'autre "méchant".
 - **Score cible configurable** (3 par défaut) : dès qu'un·e joueur·se l'atteint, le match se termine et le classement final s'affiche. Sinon, une nouvelle manche démarre automatiquement (thème et rôles neufs).
 - **Jusqu'à 16 joueurs** par salle.
-- **500 thèmes officiels**, répartis en 19 catégories (voir `data/themes.csv`).
+- **La base de thèmes vit dans `data/themes.csv`**, lue directement par le serveur à chaque démarrage — éditer ce fichier (même juste sur GitHub) et redéployer suffit, aucune étape supplémentaire.
 
 ## Architecture
 
 ```
 server.ts                      Serveur Node custom : Next.js + Socket.io sur le même port
 data/
-  themes.csv                    Source éditable des 500 thèmes officiels
+  themes.csv                    Base de thèmes officiels — lue directement au démarrage du serveur
 src/
   app/
     page.tsx                   Accueil (créer/rejoindre)
@@ -45,7 +47,7 @@ src/
       GameEngine.ts            Machine à états centralisée (LOBBY → ... → GAME_OVER)
       GameRules.ts             Points individuels, gagnant à la pluralité (cible unique)
       RoomStore.ts             Store en mémoire (rooms + sessions)
-      themes.ts / themes-data.ts   500 thèmes officiels (themes-data.ts est généré, voir ci-dessous)
+      themes.ts                Lit et parse data/themes.csv au démarrage du serveur (voir ci-dessous)
       types.ts                 Types SERVEUR uniquement (contiennent les rôles)
     music/
       MusicProvider.ts         Interface commune
@@ -62,7 +64,6 @@ src/
     ...                          Autres composants UI réutilisables
 scripts/
   generate-mock-audio.mjs       Génère les pistes de secours synthétiques (postinstall)
-  build-themes.mjs              Régénère themes-data.ts depuis data/themes.csv
   check-setup.mjs               Diagnostic convivial
   e2e-smoke-test.mjs            Tests d'intégration : parties complètes simulées via Socket.io
 tests/                          Tests unitaires Vitest (règles, resolver, thèmes)
@@ -70,23 +71,21 @@ tests/                          Tests unitaires Vitest (règles, resolver, thèm
 
 ### Ajouter ou modifier des thèmes
 
-La base de 500 thèmes vit dans `data/themes.csv` (colonnes : `id,theme_a,theme_b,difficulty,category,reversible`). Pour en ajouter :
+La base de thèmes vit dans `data/themes.csv` (colonnes : `id,theme_a,theme_b,difficulty,category,reversible`) et **c'est la seule source de vérité** — `src/lib/game/themes.ts` la lit et la parse directement à chaque démarrage du serveur, il n'y a aucun fichier généré à tenir synchronisé.
 
-1. Édite `data/themes.csv` (ajoute des lignes, un id unique par ligne).
-2. Régénère le fichier de données :
-   ```bash
-   node scripts/build-themes.mjs
-   ```
-   Ça réécrit `src/lib/game/themes-data.ts` — ne modifie jamais ce fichier à la main, il est écrasé à chaque régénération.
+Pour en ajouter ou en modifier : édite `data/themes.csv` (même directement sur GitHub, pas besoin d'être en local), commit, push. Le prochain déploiement (qui redémarre le serveur) relit le fichier tel quel — rien d'autre à faire, aucun script à lancer. Une ligne mal formée (id ou thème vide) est simplement ignorée avec un avertissement dans les logs du serveur plutôt que de faire planter le jeu.
 
 ## Décisions d'architecture assumées (et pourquoi)
 
 - **Rôle jamais révélé à son propriétaire (sauf Mr White, par construction).** Civil et infiltré reçoivent tous les deux exactement la même forme de message réseau (`{ playerId, theme }`) : rien — même en inspectant le trafic réseau — ne permet de deviner lequel des deux on est.
 - **Vote en deux tours à cible unique, résultat combiné révélé à la fin seulement.** Avec exactement un infiltré et un Mr White optionnel, un seul suspect par bulletin suffit à chaque tour (pas de cases à cocher). Le second tour démarre immédiatement après le premier SANS jamais exposer son résultat au client entre les deux (`voteReveal` reste `null` côté état public tant que les deux tours ne sont pas clos) — sinon voir qui a été accusé au tour 1 orienterait le vote du tour 2. En cas d'égalité au sommet d'un tour, personne n'est désigné pour ce tour-là (pas de second tour de rattrapage, volontairement, pour éviter le n'importe quoi).
 - **Points individuels, pas d'équipe.** Un infiltré ou Mr White démasqué gagne 0 point même si l'autre "méchant" survit à côté de lui — chacun est jugé sur sa propre survie, pas sur le sort collectif d'un camp.
+- **Dernière chance de Mr White = flip de survie, pas de court-circuit du match.** Une réponse correcte ne met pas fin au match instantanément (ça casserait tout le système de score cible/manches enchaînées) : elle fait juste repasser Mr White du côté "survivant" pour le calcul des points de CETTE manche (`isAlive` remis à `true`, retiré de `lastEliminatedPlayerIds`) — il gagne donc ses +2 comme s'il n'avait jamais été pris. La comparaison de la réponse est normalisée (`normalizeGuess` — insensible à la casse, aux accents, aux espaces superflus) pour ne pas pénaliser une faute de frappe anodine ; l'hôte a aussi une validation manuelle en secours.
+- **Base de thèmes lue directement depuis le CSV au démarrage, sans étape de build séparée.** Une version antérieure générait un fichier TypeScript à partir du CSV via un script à lancer manuellement — piège classique pour un non-développeur éditant le CSV depuis l'éditeur web de GitHub : le fichier généré restait périmé sans aucun message d'erreur. `themes.ts` parse maintenant `data/themes.csv` lui-même à l'import (mis en cache par Node pour la durée du process) ; éditer le CSV et redéployer suffit.
 - **Rôles de la manche révélés à tous une fois le résultat connu (phase elimination).** La manche est terminée : plus de raison stratégique de cacher qui avait quel rôle. C'est aussi ce qui permet à chacun de comprendre pourquoi son score vient de changer, alors qu'il ne connaissait pas son propre rôle avant cet instant.
 - **Envoi automatique de l'indice musical.** Coller un lien et cliquer "Analyser" suffit : dès que la résolution réussit, l'indice est immédiatement diffusé à toute la room (pas d'étape de confirmation séparée), et la lecture démarre sans clic supplémentaire.
 - **Lecture synchronisée (façon Watch2gether) via l'API JS YouTube plutôt que l'URL d'intégration seule.** La personne qui vient d'envoyer l'indice a de vrais contrôles YouTube (`YT.Player`, pas un simple `<iframe src>`) ; chaque lecture/pause de sa part est diffusée à toute la room via un événement Socket.io dédié (`clue:control`), et les autres clients rejouent l'action sur leur propre lecteur (`playVideo()`/`pauseVideo()`/`seekTo()`), avec un petit rattrapage de délai réseau basé sur l'horodatage serveur. Les spectateurs ont un lecteur verrouillé (pas de contrôles, pas d'interaction) pour éviter que quelqu'un desynchronise tout le monde par erreur — **sauf le volume**, qui n'est jamais diffusé et reste réglable localement par tout le monde en permanence (`setVolume()`/`mute()`, mémorisé en `localStorage`, appliqué au montage de chaque nouveau lecteur) : couper le son ou le remonter pour soi-même ne doit jamais dépendre du présentateur. Un bouton "Passer" (réservé au présentateur) permet aussi de passer directement à la suite en cas de bug ou de musique ratée, sans attendre le minuteur. Limite assumée : si l'autoplay avec son est bloqué par le navigateur d'un spectateur (ça arrive, un événement réseau n'est pas un vrai clic aux yeux du navigateur), un bouton "Rejoindre la lecture" apparaît — un clic suffit à débloquer. La réécoute libre pendant la discussion n'est PAS synchronisée (chacun rembobine ce qu'il veut individuellement) : la synchro ne s'applique qu'à l'écran "tout le monde écoute ensemble".
+- **Réactions emoji éphémères, liste fermée validée aussi côté serveur.** N'importe quel joueur (pas seulement le présentateur) peut envoyer un emoji parmi une liste fixe (`src/lib/reactions.ts`, partagée entre le bouton client et la validation serveur pour ne jamais diverger) pendant `clue_playback` uniquement. Le serveur ne fait que relayer l'événement à toute la room (`broadcastToRoom`, le même mécanisme que watch2gether) — rien n'est stocké dans l'état de la room, ce n'est pas une donnée de jeu mais un pur événement transitoire. Volontairement pas de texte libre : évite toute modération à prévoir, et garde l'esprit "réaction instantanée façon Twitch" plutôt qu'un chat. Chaque réaction reçue est animée côté client (montée + disparition, position/rotation aléatoires) puis retirée de l'état local une fois son animation terminée.
 - **La reconnexion automatique reste toujours silencieuse.** Le client tente de se rattacher à sa session à chaque connexion (y compris la toute première visite, où il n'y a évidemment aucune session à retrouver) — le serveur ne renvoie donc jamais d'erreur visible pour un échec de cette reconnexion en tâche de fond ; ce n'en est pas une pour l'utilisateur.
 - **YouTube plutôt que Spotify/Apple Music.** Spotify ne garantit plus d'extrait audio pour tous les morceaux depuis fin 2024, et Apple Music demande un compte développeur payant (99 $/an). YouTube n'a ni l'un ni l'autre problème : le lecteur officiel embarqué (`youtube.com/embed/ID`) et l'endpoint public `oEmbed` (métadonnées) ne demandent aucune authentification. L'extrait diffusé est plafonné (60s par défaut, réglable par l'hôte) via les paramètres `start`/`end` de l'URL d'intégration.
 - **Store en mémoire plutôt que Postgres/Supabase.** Une room de party game est éphémère (quelques dizaines de minutes) ; un `Map()` en process donne le temps réel le plus simple à développer et opérer pour un MVP. Limite explicite : un redémarrage du process perd les parties en cours, et ça ne scale pas horizontalement sans ajouter une couche partagée (Redis, ou brancher Postgres/Supabase derrière `RoomStore` — l'interface est déjà isolée pour ça).
@@ -99,12 +98,14 @@ La base de 500 thèmes vit dans `data/themes.csv` (colonnes : `id,theme_a,theme_
 
 ## Tests
 
-- `npm test` — points individuels par rôle/survie, résolution à la pluralité (cible unique), résolution mock, extraction d'ID YouTube, intégrité de la base de 500 thèmes (pas de doublon, pas de thème vide).
-- `node scripts/e2e-smoke-test.mjs` (serveur démarré en parallèle) — 6 scénarios indépendants via Socket.io :
+- `npm test` — points individuels par rôle/survie, résolution à la pluralité (cible unique), résolution mock, extraction d'ID YouTube, intégrité de la base de thèmes (pas de doublon, pas de thème vide, plusieurs catégories) lue en direct depuis `data/themes.csv`.
+- `node scripts/e2e-smoke-test.mjs` (serveur démarré en parallèle) — 8 scénarios indépendants via Socket.io :
   - un match complet (secret de rôle vérifié indiscernable, un seul infiltré, vote à cible unique, élimination, **score individuel vérifié explicitement — pas d'équipe**, fin de match) ;
   - **les deux tours de vote avec Mr White activé — vérifie explicitement que rien n'est révélé entre les deux tours, puis que la révélation combinée est correcte** ;
   - l'enchaînement automatique d'une manche à l'autre sans repasser par le lobby ;
+  - **la dernière chance de Mr White, dans les deux cas : mauvaise réponse (reste éliminé, 0 point) et bonne réponse même avec casse/accents/espaces différents (compte comme survivant, gagne ses points)** ;
   - **le contrôle de lecture watch2gether (autorisation refusée à un non-présentateur, diffusion identique à tout le monde) et le bouton "Passer" (réservé au présentateur, avance quasi immédiatement)** ;
+  - **les réactions emoji (n'importe quel joueur peut réagir, mais seulement pendant l'écoute ; un emoji hors liste fermée est refusé ; la réaction est diffusée identique à tout le monde)** ;
   - **la reconnexion silencieuse au premier chargement (plus d'erreur "Session inconnue")** ;
   - le bouton "Quitter" en lobby.
 

@@ -16,8 +16,9 @@ import { DEFAULT_ROOM_SETTINGS } from "@/types";
 import { createEmptyRoom, type ServerPlayer, type ServerRoom } from "./types";
 import { OFFICIAL_THEMES, pickRandomTheme } from "./themes";
 import { GameRules } from "./GameRules";
+import { isValidReactionEmoji } from "@/lib/reactions";
 import { MusicResolver } from "@/lib/music/MusicResolver";
-import { createId, createRoomCode, randomAvatar, shuffle } from "@/lib/utils";
+import { createId, createRoomCode, guessMatchesTheme, randomAvatar, shuffle } from "@/lib/utils";
 import { RoomStore } from "./RoomStore";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ const MIN_PLAYERS_TO_START = 3;
 const NEXT_PLAYER_PAUSE_MS = 1_800;
 const ROUND_RESULT_PAUSE_MS = 4_000;
 const NEXT_ROUND_PAUSE_MS = 2_500;
+const MR_WHITE_GUESS_TIMEOUT_MS = 45_000;
 
 export type EngineResult<T = void> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -210,6 +212,8 @@ export class GameEngine {
     room.phase = "role_reveal";
     room.lastEliminatedPlayerIds = [];
     room.lastEliminatedRoles = {};
+    room.mrWhiteGuessPlayerId = null;
+    room.mrWhiteGuessResult = null;
     this.sendAllSecrets();
     this.bus.broadcastState(room);
     // Pas de délai automatique ici (demande explicite) : la manche n'avance
@@ -408,6 +412,21 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
+  /**
+   * Réaction emoji éphémère façon "emote spam" Twitch, pendant l'écoute
+   * uniquement. Aucun texte libre (liste fermée validée côté serveur, pas
+   * seulement côté client), et rien n'est conservé dans l'état de la room —
+   * c'est un pur événement diffusé, pas une donnée de jeu.
+   */
+  sendReaction(playerId: string, emoji: string): EngineResult {
+    const room = this.room;
+    if (room.phase !== "clue_playback") return { ok: false, error: "Les réactions ne sont possibles que pendant l'écoute." };
+    if (!room.players.get(playerId)) return { ok: false, error: "Joueur introuvable." };
+    if (!isValidReactionEmoji(emoji)) return { ok: false, error: "Cet emoji n'est pas autorisé." };
+    this.bus.broadcastToRoom("reaction:receive", { id: createId("reaction"), emoji });
+    return { ok: true, value: undefined };
+  }
+
   private advanceToNextTurnOrDiscussion(): void {
     const room = this.room;
     room.currentTurnIndex += 1;
@@ -557,7 +576,83 @@ export class GameEngine {
 
     room.phase = "elimination";
     this.bus.broadcastState(room);
-    this.scheduleTimeout(4_000, () => this.concludeRound());
+    this.scheduleTimeout(4_000, () => this.afterElimination());
+  }
+
+  /** Si Mr White vient d'être démasqué, il a droit à une dernière chance avant de conclure la manche. */
+  private afterElimination(): void {
+    const room = this.room;
+    const mrWhite = [...room.players.values()].find((p) => p.role === "mrwhite");
+    if (mrWhite && room.lastEliminatedPlayerIds.includes(mrWhite.id)) {
+      this.beginMrWhiteGuess(mrWhite.id);
+      return;
+    }
+    this.concludeRound();
+  }
+
+  // ---- Dernière chance de Mr White — deviner le thème des civils pour s'en
+  // sortir malgré tout, même une fois démasqué. --------------------------------
+
+  private beginMrWhiteGuess(playerId: string): void {
+    const room = this.room;
+    room.mrWhiteGuessPlayerId = playerId;
+    room.mrWhiteGuessResult = null;
+    room.phase = "mrwhite_guess";
+    room.phaseDeadline = Date.now() + MR_WHITE_GUESS_TIMEOUT_MS;
+    this.bus.broadcastState(room);
+    this.scheduleTimeout(MR_WHITE_GUESS_TIMEOUT_MS, () => this.resolveMrWhiteGuess(playerId, null));
+  }
+
+  /** Mr White soumet lui-même sa réponse. */
+  submitMrWhiteGuess(playerId: string, guess: string): EngineResult {
+    const room = this.room;
+    if (room.phase !== "mrwhite_guess" || room.mrWhiteGuessPlayerId !== playerId) {
+      return { ok: false, error: "Ce n'est pas à toi de deviner." };
+    }
+    this.clearTimer();
+    this.resolveMrWhiteGuess(playerId, guess);
+    return { ok: true, value: undefined };
+  }
+
+  /**
+   * Validation manuelle par l'hôte — utile si Mr White annonce sa réponse à
+   * voix haute plutôt que de la taper, ou en cas de désaccord sur une
+   * réponse limite que la comparaison automatique aurait refusée.
+   */
+  hostValidateMrWhiteGuess(hostId: string, correct: boolean): EngineResult {
+    const room = this.room;
+    if (room.hostPlayerId !== hostId) return { ok: false, error: "Seul l'hôte peut valider." };
+    if (room.phase !== "mrwhite_guess" || !room.mrWhiteGuessPlayerId) {
+      return { ok: false, error: "Aucune devinette en attente." };
+    }
+    const playerId = room.mrWhiteGuessPlayerId;
+    this.clearTimer();
+    this.finishMrWhiteGuess(playerId, "(validé par l'hôte)", correct);
+    return { ok: true, value: undefined };
+  }
+
+  private resolveMrWhiteGuess(playerId: string, guess: string | null): void {
+    const room = this.room;
+    const civilTheme = room.themePair?.civilTheme ?? "";
+    const correct = guess !== null && guessMatchesTheme(guess, civilTheme);
+    this.finishMrWhiteGuess(playerId, guess ?? "", correct);
+  }
+
+  private finishMrWhiteGuess(playerId: string, guess: string, correct: boolean): void {
+    const room = this.room;
+    room.mrWhiteGuessResult = { guess, correct };
+    room.mrWhiteGuessPlayerId = null;
+
+    if (correct) {
+      // Démasqué, mais il devine le thème : il s'en sort malgré tout — on
+      // annule son élimination, il compte comme survivant pour le score de
+      // cette manche (mêmes points que s'il n'avait jamais été pris).
+      const player = room.players.get(playerId);
+      if (player) player.isAlive = true;
+      room.lastEliminatedPlayerIds = room.lastEliminatedPlayerIds.filter((id) => id !== playerId);
+    }
+
+    this.concludeRound();
   }
 
   // ---- Fin de manche — score, puis manche suivante ou fin du match -----------
@@ -655,6 +750,9 @@ export class GameEngine {
       case "voting_mrwhite":
         this.resolveCurrentVote();
         break;
+      case "mrwhite_guess":
+        if (room.mrWhiteGuessPlayerId) this.resolveMrWhiteGuess(room.mrWhiteGuessPlayerId, null);
+        break;
       default:
         return { ok: false, error: "Cette phase ne peut pas être forcée." };
     }
@@ -709,6 +807,8 @@ export class GameEngine {
     room.mrWhiteTally = null;
     room.lastEliminatedPlayerIds = [];
     room.lastEliminatedRoles = {};
+    room.mrWhiteGuessPlayerId = null;
+    room.mrWhiteGuessResult = null;
     room.matchWinnerIds = null;
     room.phaseDeadline = null;
     room.themePair = null;
@@ -796,6 +896,8 @@ export class GameEngine {
       lastEliminatedPlayerIds: room.lastEliminatedPlayerIds,
       lastEliminatedRoles: room.lastEliminatedRoles,
       voteReveal,
+      mrWhiteGuessPlayerId: room.mrWhiteGuessPlayerId,
+      mrWhiteGuessResult: room.mrWhiteGuessResult,
       votesSubmittedCount: room.votes.size,
       discussionReadyCount,
       lastRoundRoles: room.lastRoundRoles,

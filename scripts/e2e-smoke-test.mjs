@@ -15,6 +15,7 @@ function makeClient(nickname) {
   let lastError = null;
   let lastControl = null;
   let errorCount = 0;
+  let receivedReactions = [];
 
   socket.on("connect_error", (err) => console.error(`❌ [${nickname}] connect_error:`, err.message));
   socket.on("room:state", (s) => {
@@ -34,6 +35,9 @@ function makeClient(nickname) {
   });
   socket.on("clue:control", (p) => {
     lastControl = p;
+  });
+  socket.on("reaction:receive", (p) => {
+    receivedReactions.push(p);
   });
 
   return {
@@ -60,11 +64,17 @@ function makeClient(nickname) {
     get errorCount() {
       return errorCount;
     },
+    get receivedReactions() {
+      return receivedReactions;
+    },
     clearError() {
       lastError = null;
     },
     clearControl() {
       lastControl = null;
+    },
+    clearReactions() {
+      receivedReactions = [];
     }
   };
 }
@@ -327,6 +337,127 @@ async function scenarioTwoVoteRounds() {
 // ---------------------------------------------------------------------------
 // Scénario 3 : enchaînement automatique des manches (score cible non atteint).
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Mr White démasqué a une dernière chance de deviner le thème des civils —
+// correct = il compte comme survivant (mêmes points) ; faux = reste éliminé.
+// Scindé en deux scénarios (au lieu d'un seul) pour laisser à chacun un
+// budget de temps réaliste — une manche complète en mode démo prend déjà
+// 15-20s à elle seule, et ce mécanisme en ajoute une par cas testé.
+// ---------------------------------------------------------------------------
+async function scenarioMrWhiteLastChance() {
+  // --- Cas 1 : Mr White devine juste -> il s'en sort, gagne ses points ---
+  const p1 = makeClient("Nora");
+  const p2 = makeClient("Yanis");
+  const p3 = makeClient("Ines");
+  const p4 = makeClient("Sofia");
+  const players = [p1, p2, p3, p4];
+  await wait(400);
+
+  p1.socket.emit("room:create", {
+    nickname: "Nora",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: true, targetScore: 100 }
+  });
+  await waitFor(() => p1.roomCode, "Nora a créé une salle avec Mr White activé");
+  p2.socket.emit("room:join", { code: p1.roomCode, nickname: "Yanis" });
+  p3.socket.emit("room:join", { code: p1.roomCode, nickname: "Ines" });
+  p4.socket.emit("room:join", { code: p1.roomCode, nickname: "Sofia" });
+  await waitFor(() => p2.playerId && p3.playerId && p4.playerId, "Les 3 invités ont rejoint");
+
+  p1.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => players.every((p) => p.secret), "Secrets reçus");
+
+  const withTheme = players.filter((p) => p.secret.theme !== null);
+  const mrWhitePlayer = players.find((p) => p.secret.theme === null);
+  const groups = groupByTheme(withTheme);
+  const civilGroup = [...groups.values()].find((g) => g.length === 2);
+  const undercoverPlayer = [...groups.values()].find((g) => g.length === 1)[0];
+  const civilTheme = civilGroup[0].secret.theme;
+
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+  await playOneRound(players, p1);
+  players.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+
+  players.filter((p) => p !== undercoverPlayer).forEach((p) => p.socket.emit("vote:submit", { targetId: undercoverPlayer.playerId }));
+  undercoverPlayer.socket.emit("vote:submit", { targetId: civilGroup[0].playerId });
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_mrwhite", 8000)));
+
+  players.filter((p) => p !== mrWhitePlayer).forEach((p) => p.socket.emit("vote:submit", { targetId: mrWhitePlayer.playerId }));
+  mrWhitePlayer.socket.emit("vote:submit", { targetId: civilGroup[1].playerId });
+
+  await Promise.all(players.map((p) => waitForPhase(p, "mrwhite_guess", 10_000)));
+  assert(p1.state.mrWhiteGuessPlayerId === mrWhitePlayer.playerId, "La dernière chance est bien proposée à Mr White, démasqué par le vote");
+
+  // Guess incorrect refusé par le serveur lui-même (pas juste par le joueur qui s'est trompé).
+  mrWhitePlayer.socket.emit("mrwhite:submit_guess", { guess: "n'importe quoi qui ne colle évidemment pas" });
+  await waitForPhase(p1, "round_result", 8000);
+  assert(p1.state.mrWhiteGuessResult.correct === false, "Une mauvaise réponse est bien jugée incorrecte");
+  assert(p1.state.lastEliminatedPlayerIds.includes(mrWhitePlayer.playerId), "Mr White reste éliminé après une mauvaise réponse");
+  const scoreAfterWrongGuess = p1.state.players.find((pl) => pl.id === mrWhitePlayer.playerId).score;
+  assert(scoreAfterWrongGuess === 0, `Mr White éliminé (mauvaise réponse) gagne 0 point (score=${scoreAfterWrongGuess})`);
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
+async function scenarioMrWhiteLastChanceCorrectGuess() {
+  // --- Cas 2 : bonne réponse (avec accents/casse différents) -> il s'en sort ---
+  const q1 = makeClient("Malo2");
+  const q2 = makeClient("Chloe2");
+  const q3 = makeClient("Adam2");
+  const q4 = makeClient("Zoe2");
+  const players2 = [q1, q2, q3, q4];
+  await wait(300);
+
+  q1.socket.emit("room:create", {
+    nickname: "Malo2",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: true, targetScore: 100 }
+  });
+  await waitFor(() => q1.roomCode, "Deuxième salle créée");
+  q2.socket.emit("room:join", { code: q1.roomCode, nickname: "Chloe2" });
+  q3.socket.emit("room:join", { code: q1.roomCode, nickname: "Adam2" });
+  q4.socket.emit("room:join", { code: q1.roomCode, nickname: "Zoe2" });
+  await waitFor(() => q2.playerId && q3.playerId && q4.playerId, "Les 3 invités ont rejoint (2e salle)");
+
+  q1.socket.emit("host:start_game", {});
+  await Promise.all(players2.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => players2.every((p) => p.secret), "Secrets reçus (2e salle)");
+
+  const withTheme2 = players2.filter((p) => p.secret.theme !== null);
+  const mrWhite2 = players2.find((p) => p.secret.theme === null);
+  const groups2 = groupByTheme(withTheme2);
+  const civilGroup2 = [...groups2.values()].find((g) => g.length === 2);
+  const undercover2 = [...groups2.values()].find((g) => g.length === 1)[0];
+  const civilTheme2 = civilGroup2[0].secret.theme;
+
+  players2.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players2.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+  await playOneRound(players2, q1);
+  players2.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(players2.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+
+  players2.filter((p) => p !== undercover2).forEach((p) => p.socket.emit("vote:submit", { targetId: undercover2.playerId }));
+  undercover2.socket.emit("vote:submit", { targetId: civilGroup2[0].playerId });
+  await Promise.all(players2.map((p) => waitForPhase(p, "voting_mrwhite", 8000)));
+
+  players2.filter((p) => p !== mrWhite2).forEach((p) => p.socket.emit("vote:submit", { targetId: mrWhite2.playerId }));
+  mrWhite2.socket.emit("vote:submit", { targetId: civilGroup2[1].playerId });
+  await Promise.all(players2.map((p) => waitForPhase(p, "mrwhite_guess", 10_000)));
+
+  // Réponse correcte mais volontairement mal casée/accentuée/espacée : la
+  // comparaison doit être normalisée (insensible casse/accents/espaces).
+  const messyGuess = "  " + civilTheme2.toUpperCase().replace(/É/g, "e").replace(/È/g, "e") + "  ";
+  mrWhite2.socket.emit("mrwhite:submit_guess", { guess: messyGuess });
+  await waitForPhase(q1, "round_result", 8000);
+  assert(q1.state.mrWhiteGuessResult.correct === true, "Une bonne réponse est reconnue même avec casse/accents/espaces différents");
+  assert(!q1.state.lastEliminatedPlayerIds.includes(mrWhite2.playerId), "Mr White n'est plus considéré comme éliminé après une bonne réponse");
+  const scoreAfterCorrectGuess = q1.state.players.find((pl) => pl.id === mrWhite2.playerId).score;
+  assert(scoreAfterCorrectGuess === 2, `Mr White qui devine juste gagne ses points comme s'il avait survécu (score=${scoreAfterCorrectGuess})`);
+
+  players2.forEach((p) => p.socket.disconnect());
+}
+
 async function scenarioRoundContinuation() {
   const a2 = makeClient("Nora");
   const b2 = makeClient("Yanis");
@@ -436,6 +567,64 @@ async function scenarioPlaybackControlAndSkip() {
 // ---------------------------------------------------------------------------
 // Scénario 5 : le bug "session inconnue" ne se produit plus au premier chargement.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Scénario 5 : réactions emoji — diffusées à tout le monde pendant l'écoute
+// uniquement, liste fermée validée côté serveur (pas de texte libre).
+// ---------------------------------------------------------------------------
+async function scenarioReactions() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
+  await wait(400);
+
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
+  });
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
+
+  // --- Hors phase d'écoute (encore dans le lobby) : une réaction est refusée ---
+  sarah.clearError();
+  sarah.socket.emit("reaction:send", { emoji: "🔥" });
+  await waitFor(() => sarah.lastError, "Une réaction envoyée hors de l'écoute (ici : en lobby) est refusée");
+
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+
+  const currentId = alex.state.currentTurnPlayerId;
+  const presenter = players.find((p) => p.playerId === currentId);
+  const viewer = players.find((p) => p.playerId !== currentId);
+
+  presenter.socket.emit("music:submit_url", { url: "mock://demo-01" });
+  await Promise.all(players.map((p) => waitForPhase(p, "clue_playback", 5000)));
+
+  // --- Un emoji hors liste fermée est refusé (pas de texte libre) ---
+  viewer.clearError();
+  viewer.socket.emit("reaction:send", { emoji: "coucou" });
+  await waitFor(() => viewer.lastError, "Un texte libre (hors liste fermée d'emojis) est refusé");
+
+  // --- Un emoji valide, envoyé par n'IMPORTE QUEL joueur (pas que le présentateur), est diffusé à TOUT LE MONDE ---
+  players.forEach((p) => p.clearReactions());
+  viewer.socket.emit("reaction:send", { emoji: "😂" });
+  await Promise.all(players.map((p) => waitFor(() => p.receivedReactions.length === 1, `${p.nickname} reçoit bien la réaction`)));
+  assert(
+    players.every((p) => p.receivedReactions[0].emoji === "😂"),
+    "La réaction diffusée est identique pour tout le monde, y compris son propre émetteur"
+  );
+  assert(
+    players.every((p) => typeof p.receivedReactions[0].id === "string" && p.receivedReactions[0].id.length > 0),
+    "Chaque réaction a un identifiant unique (pour que l'UI puisse l'animer puis la retirer)"
+  );
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
 async function scenarioSilentRejoin() {
   const fresh = makeClient("NouveauVisiteur");
   await wait(400);
@@ -488,7 +677,10 @@ async function main() {
   await runScenario("Match principal (un seul infiltré, vote à cible unique)", scenarioMainMatch, 45_000);
   await runScenario("Deux tours de vote (Mr White) sans rien révéler entre les deux", scenarioTwoVoteRounds, 45_000);
   await runScenario("Enchaînement automatique des manches", scenarioRoundContinuation, 45_000);
+  await runScenario("Dernière chance de Mr White — mauvaise réponse", scenarioMrWhiteLastChance, 45_000);
+  await runScenario("Dernière chance de Mr White — bonne réponse", scenarioMrWhiteLastChanceCorrectGuess, 45_000);
   await runScenario("Contrôle de lecture watch2gether + bouton Passer", scenarioPlaybackControlAndSkip, 20_000);
+  await runScenario("Réactions emoji (emote spam pendant l'écoute)", scenarioReactions, 20_000);
   await runScenario("Reconnexion silencieuse (bug session inconnue)", scenarioSilentRejoin, 10_000);
   await runScenario("Quitter la salle en lobby", scenarioLeaveRoom, 15_000);
 
@@ -507,6 +699,6 @@ main().catch((err) => {
 });
 
 setTimeout(() => {
-  console.error("\n❌ Timeout global absolu (200s) — le process est forcé de s'arrêter.");
+  console.error("\n❌ Timeout global absolu (280s) — le process est forcé de s'arrêter.");
   process.exit(1);
-}, 200_000);
+}, 280_000);

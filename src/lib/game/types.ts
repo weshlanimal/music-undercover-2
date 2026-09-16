@@ -48,6 +48,9 @@ export interface ServerRoom {
   mrWhiteTally: VoteTally | null;
   lastEliminatedPlayerIds: string[];
   lastEliminatedRoles: Record<string, Role>;
+  /** Qui doit deviner le thème des civils, le cas échéant (phase mrwhite_guess). */
+  mrWhiteGuessPlayerId: string | null;
+  mrWhiteGuessResult: { guess: string; correct: boolean } | null;
   lastRoundRoles: Record<string, Role>;
   matchWinnerIds: string[] | null;
   phaseDeadline: number | null;
@@ -77,6 +80,8 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     mrWhiteTally: null,
     lastEliminatedPlayerIds: [],
     lastEliminatedRoles: {},
+    mrWhiteGuessPlayerId: null,
+    mrWhiteGuessResult: null,
     lastRoundRoles: {},
     matchWinnerIds: null,
     phaseDeadline: null,

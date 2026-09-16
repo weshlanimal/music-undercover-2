@@ -76,6 +76,7 @@ export type GamePhase =
   | "voting_undercover"
   | "voting_mrwhite"
   | "elimination"
+  | "mrwhite_guess"
   | "round_result"
   | "game_over";
 
@@ -161,7 +162,11 @@ export interface PublicRoomState {
   lastEliminatedRoles: Record<string, Role>;
   /** Rempli uniquement une fois les deux tours de vote clos (phase elimination et après) — jamais entre les deux tours. */
   voteReveal: VoteReveal | null;
-  /** Nombre de bulletins déjà reçus pendant LE TOUR DE VOTE EN COURS (le détail reste cassé jusqu'à la révélation finale). */
+  /** Non-null pendant la phase mrwhite_guess : qui doit deviner le thème des civils pour s'en sortir malgré tout. */
+  mrWhiteGuessPlayerId: string | null;
+  /** Rempli une fois la devinette de Mr White résolue (correcte ou non) — visible dès round_result. */
+  mrWhiteGuessResult: { guess: string; correct: boolean } | null;
+  /** Nombre de bulletins déjà reçus pendant LE TOUR DE VOTE EN COURS (le détail reste caché jusqu'à la révélation finale). */
   votesSubmittedCount: number;
   /** Nombre de joueurs prêts à passer au vote pendant la discussion. */
   discussionReadyCount: number;

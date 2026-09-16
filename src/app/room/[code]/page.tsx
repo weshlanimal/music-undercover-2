@@ -11,6 +11,8 @@ import { PhaseShell } from "@/components/PhaseShell";
 import { CountdownRing } from "@/components/CountdownRing";
 import { ClueMedia } from "@/components/ClueMedia";
 import { QuitButton } from "@/components/QuitButton";
+import { ReactionOverlay } from "@/components/ReactionOverlay";
+import { ReactionPicker } from "@/components/ReactionPicker";
 import { useGameSocket } from "@/lib/socket/client";
 import { mockDemoLinks } from "@/lib/music/MockMusicProvider";
 import type { MusicClue, PrivatePlayerSecret, Role } from "@/types";
@@ -22,7 +24,7 @@ export default function RoomPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const socket = useGameSocket();
-  const { state, playerId, connected, errorMessage, mySecret, leaveRoom } = socket;
+  const { state, playerId, connected, errorMessage, mySecret, leaveRoom, reactions, removeReaction } = socket;
 
   function handleQuit() {
     leaveRoom();
@@ -39,6 +41,7 @@ export default function RoomPage() {
     return (
       <>
         <QuitButton onQuit={handleQuit} />
+        <ReactionOverlay reactions={reactions} onExpire={removeReaction} />
         <PhaseShell title="Connexion à la salle…" subtitle={errorMessage ?? "Un instant."}>
           {errorMessage && (
             <a href="/" className="mt-4 inline-block text-wave underline">
@@ -58,6 +61,7 @@ export default function RoomPage() {
   return (
     <>
       <QuitButton onQuit={handleQuit} />
+      <ReactionOverlay reactions={reactions} onExpire={removeReaction} />
       {showThemeBadge && <MyThemeBadge secret={mySecret!} />}
       <RoomByPhase key={state.phase} {...socket} state={state} playerId={playerId} />
     </>
@@ -88,6 +92,8 @@ function RoomByPhase(props: Props) {
       return <PhaseVoting {...props} />;
     case "elimination":
       return <PhaseElimination {...props} />;
+    case "mrwhite_guess":
+      return <PhaseMrWhiteGuess {...props} />;
     case "round_result":
       return <PhaseRoundResult {...props} />;
     case "game_over":
@@ -493,7 +499,7 @@ function TurnProgress({ state }: { state: Props["state"] }) {
 // la personne qui vient d'envoyer l'indice contrôle lecture/pause/défilement
 // pour tout le monde ; les autres suivent en lecture seule.
 // ---------------------------------------------------------------------------
-function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackControl, skipCluePlayback }: Props) {
+function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackControl, skipCluePlayback, sendReaction }: Props) {
   const clue = state.clues[state.clues.length - 1];
   const owner = state.players.find((p) => p.id === clue?.playerId);
   const isController = !!clue && clue.playerId === playerId;
@@ -530,6 +536,9 @@ function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackContr
       ) : (
         <p className="mt-3 text-center text-xs text-paper-faint">{owner?.nickname ?? "Le joueur"} contrôle la lecture pour tout le monde.</p>
       )}
+      <div className="mt-5">
+        <ReactionPicker onSend={sendReaction} />
+      </div>
     </PhaseShell>
   );
 }
@@ -747,6 +756,77 @@ function PhaseElimination({ state }: Props) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// DERNIÈRE CHANCE DE MR WHITE — démasqué, il peut encore s'en sortir en
+// devinant le thème des civils. Réponse correcte = traité comme survivant
+// pour le score de la manche, malgré l'élimination.
+// ---------------------------------------------------------------------------
+function PhaseMrWhiteGuess({ state, playerId, submitMrWhiteGuess, hostValidateMrWhiteGuess }: Props) {
+  const isGuesser = state.mrWhiteGuessPlayerId === playerId;
+  const isHost = state.hostPlayerId === playerId;
+  const [guess, setGuess] = useState("");
+  const [sent, setSent] = useState(false);
+
+  if (isGuesser) {
+    return (
+      <PhaseShell
+        eyebrow="Tu es démasqué"
+        title="Dernière chance : devine le thème des civils"
+        footer={
+          <Button
+            fullWidth
+            disabled={!guess.trim() || sent}
+            onClick={() => {
+              setSent(true);
+              submitMrWhiteGuess(guess.trim());
+            }}
+          >
+            {sent ? "Réponse envoyée…" : "Valider ma réponse"}
+          </Button>
+        }
+      >
+        {state.phaseDeadline && (
+          <div className="mb-4 flex justify-center">
+            <CountdownRing deadline={state.phaseDeadline} totalMs={45_000} />
+          </div>
+        )}
+        <TextField
+          label="Quel était le thème des civils ?"
+          value={guess}
+          onChange={(e) => setGuess(e.target.value)}
+          placeholder="Écris le thème tel que tu penses qu'il était"
+          autoFocus
+          disabled={sent}
+        />
+        <p className="mt-4 text-center text-xs text-paper-faint">Si tu trouves, tu comptes comme si tu n&apos;avais jamais été démasqué.</p>
+      </PhaseShell>
+    );
+  }
+
+  const guesser = state.players.find((p) => p.id === state.mrWhiteGuessPlayerId);
+  return (
+    <PhaseShell eyebrow="Dernière chance" title={`${guesser?.nickname ?? "Mr White"} tente de deviner le thème`}>
+      <div className="flex flex-col items-center gap-4 py-8 text-center">
+        <Avatar emoji={guesser?.avatar ?? "🎭"} size="lg" pulsing ringColor="signal" />
+        <p className="text-paper-muted">Démasqué, {guesser?.nickname ?? "il/elle"} a une dernière chance de s&apos;en sortir en devinant votre thème.</p>
+      </div>
+      {isHost && (
+        <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-ink-border bg-ink-elevated p-4">
+          <p className="text-center text-xs text-paper-faint">Outil hôte — si la réponse est annoncée à voix haute plutôt que tapée :</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" fullWidth onClick={() => hostValidateMrWhiteGuess(false)}>
+              Réponse fausse
+            </Button>
+            <Button fullWidth onClick={() => hostValidateMrWhiteGuess(true)}>
+              Réponse correcte
+            </Button>
+          </div>
+        </div>
+      )}
+    </PhaseShell>
+  );
+}
+
 function VoteRoundResult({
   label,
   tally,
@@ -803,6 +883,8 @@ function VoteRoundResult({
 function PhaseRoundResult({ state }: Props) {
   const roles = state.lastRoundRoles ?? {};
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
+  const guessResult = state.mrWhiteGuessResult;
+  const guesser = state.players.find((p) => roles[p.id] === "mrwhite");
 
   return (
     <PhaseShell
@@ -810,6 +892,20 @@ function PhaseRoundResult({ state }: Props) {
       title="Résultat de la manche"
       subtitle="La manche suivante démarre automatiquement…"
     >
+      {guessResult && (
+        <div
+          className={`mb-4 rounded-2xl border p-4 text-center ${
+            guessResult.correct ? "border-wave/50 bg-wave/10" : "border-signal/50 bg-signal-dim/30"
+          }`}
+        >
+          <p className="text-sm text-paper">
+            🎭 {guesser?.nickname ?? "Mr White"} a deviné « {guessResult.guess || "…"} »
+          </p>
+          <p className={`mt-1 font-display text-lg ${guessResult.correct ? "text-wave" : "text-signal"}`}>
+            {guessResult.correct ? "Correct — il s'en sort malgré tout !" : "Faux — il reste éliminé."}
+          </p>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         {sorted.map((p) => {
           const role = roles[p.id];

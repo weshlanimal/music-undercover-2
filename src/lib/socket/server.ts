@@ -194,6 +194,27 @@ export function attachSocketServer(io: Server): void {
       })
     );
 
+    socket.on(ClientEvents.SEND_REACTION, (payload: { emoji: string }) => {
+      if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
+      const engine = engineFor(io, data.roomCode);
+      const result = engine?.sendReaction(data.playerId, String(payload?.emoji ?? ""));
+      if (result && !result.ok) fail(socket, result.error);
+    });
+
+    socket.on(ClientEvents.SUBMIT_MRWHITE_GUESS, (payload: { guess: string }) => {
+      if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
+      const engine = engineFor(io, data.roomCode);
+      const result = engine?.submitMrWhiteGuess(data.playerId, String(payload?.guess ?? ""));
+      if (result && !result.ok) fail(socket, result.error);
+    });
+
+    socket.on(ClientEvents.HOST_VALIDATE_MRWHITE_GUESS, (payload: { correct: boolean }) => {
+      if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
+      const engine = engineFor(io, data.roomCode);
+      const result = engine?.hostValidateMrWhiteGuess(data.playerId, !!payload?.correct);
+      if (result && !result.ok) fail(socket, result.error);
+    });
+
     socket.on(ClientEvents.SUBMIT_VOTE, (payload: { targetId: string }) => {
       if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
       const engine = engineFor(io, data.roomCode);

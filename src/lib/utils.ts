@@ -16,6 +16,21 @@ export function createId(prefix: string): string {
   return `${prefix}_${nanoid(12)}`;
 }
 
+/** Comparaison normalisée pour la devinette finale de Mr White : insensible
+ *  à la casse, aux accents et aux espaces superflus. */
+export function normalizeGuess(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // retire les diacritiques
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function guessMatchesTheme(guess: string, theme: string): boolean {
+  return normalizeGuess(guess) === normalizeGuess(theme);
+}
+
 export function shuffle<T>(items: T[]): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {

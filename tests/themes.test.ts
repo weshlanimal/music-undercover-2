@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { OFFICIAL_THEMES } from "@/lib/game/themes-data";
-import { pickRandomTheme } from "@/lib/game/themes";
+import { OFFICIAL_THEMES, pickRandomTheme } from "@/lib/game/themes";
 
-describe("OFFICIAL_THEMES (générés depuis data/themes.csv)", () => {
-  it("contient 500 thèmes", () => {
-    expect(OFFICIAL_THEMES.length).toBe(500);
+// Volontairement aucun nombre codé en dur ici (ex. "doit contenir 500
+// thèmes") : c'est exactement ce genre de couplage qui rendait le fichier de
+// thèmes fragile à modifier. On teste l'INTÉGRITÉ de la base, quel que soit
+// son contenu réel dans data/themes.csv au moment du test.
+describe("OFFICIAL_THEMES (lus depuis data/themes.csv au démarrage)", () => {
+  it("contient au moins un thème", () => {
+    expect(OFFICIAL_THEMES.length).toBeGreaterThan(0);
   });
 
   it("n'a aucun id dupliqué", () => {
@@ -24,9 +27,9 @@ describe("OFFICIAL_THEMES (générés depuis data/themes.csv)", () => {
     expect(OFFICIAL_THEMES.every((t) => t.custom === false)).toBe(true);
   });
 
-  it("couvre bien plusieurs catégories (pas tout dans une seule)", () => {
+  it("couvre plusieurs catégories (pas tout dans une seule)", () => {
     const categories = new Set(OFFICIAL_THEMES.map((t) => t.category));
-    expect(categories.size).toBeGreaterThan(10);
+    expect(categories.size).toBeGreaterThan(1);
   });
 });
 
