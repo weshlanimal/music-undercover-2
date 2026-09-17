@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_ROOM_SETTINGS } from "@/types";
 import { createEmptyRoom, type ServerPlayer, type ServerRoom } from "./types";
 import { OFFICIAL_THEMES, pickRandomTheme } from "./themes";
-import { maybePickMission } from "./missions";
+import { assignMissionsForRound } from "./missions";
 import { GameRules } from "./GameRules";
 import { isValidReactionEmoji } from "@/lib/reactions";
 import { MusicResolver } from "@/lib/music/MusicResolver";
@@ -63,7 +63,7 @@ function trackKey(track: Pick<ResolvedTrack, "provider" | "providerTrackId">): s
  */
 function buildPrivateSecret(player: ServerPlayer, roundNumber: number): PrivatePlayerSecret | null {
   if (!player.role) return null;
-  return { playerId: player.id, theme: player.theme, roundNumber };
+  return { playerId: player.id, theme: player.theme, mission: player.mission, roundNumber };
 }
 
 export class GameEngine {
@@ -93,6 +93,7 @@ export class GameEngine {
       socketId: null,
       role: null,
       theme: null,
+      mission: null,
       usedTrackKeys: new Set(),
       hasPlayedThisRound: false,
       score: 0
@@ -121,6 +122,7 @@ export class GameEngine {
       socketId: null,
       role: null,
       theme: null,
+      mission: null,
       usedTrackKeys: new Set(),
       hasPlayedThisRound: false,
       score: 0
@@ -227,7 +229,6 @@ export class GameEngine {
     room.lastRoundTheme = null;
     room.mrWhiteGuessPlayerId = null;
     room.mrWhiteGuessResult = null;
-    room.currentMission = null;
     this.sendAllSecrets();
     this.bus.broadcastState(room);
     // Pas de délai automatique ici (demande explicite) : la manche n'avance
@@ -249,10 +250,15 @@ export class GameEngine {
     while (roles.length < players.length) roles.push("civil");
 
     const shuffledRoles = shuffle(roles);
+    // Mission privée par joueur pour toute la manche (pas par tour) — voir
+    // assignMissionsForRound : indépendante du thème/rôle, connue du seul
+    // joueur concerné, révélée en même temps que son thème.
+    const missions = assignMissionsForRound(players.length);
     players.forEach((player, index) => {
       const role = shuffledRoles[index]!;
       player.role = role;
       player.theme = role === "civil" ? theme.civilTheme : role === "undercover" ? theme.undercoverTheme : null;
+      player.mission = missions[index] ?? null;
       player.isAlive = true;
       player.isReady = false;
       player.usedTrackKeys = new Set();
@@ -292,7 +298,6 @@ export class GameEngine {
     room.turnOrder = shuffle(alivePlayers.map((p) => p.id));
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
-    room.currentMission = null;
     room.chatMessages = []; // fil de discussion neuf à chaque manche
     room.phase = "round_start";
     this.bus.broadcastState(room);
@@ -303,9 +308,6 @@ export class GameEngine {
     const room = this.room;
     room.phase = "waiting_for_music";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.musicSeconds * 1000 : null;
-    // Contrainte publique optionnelle, tirée pour CE tour uniquement — la
-    // plupart du temps aucune (voir maybePickMission).
-    room.currentMission = maybePickMission();
     this.bus.broadcastState(room);
     this.scheduleDeadline(room.phaseDeadline, () => this.forceSkipCurrentTurn());
   }
@@ -490,7 +492,6 @@ export class GameEngine {
     for (const p of room.players.values()) p.isReady = false;
     room.phase = "discussion";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.discussionSeconds * 1000 : null;
-    room.currentMission = null; // plus de tour de musique à ce stade, la mission n'a plus lieu d'être affichée
     this.bus.broadcastState(room);
     // Plafond dur à 5 minutes (ou la valeur configurée) : filet de sécurité
     // si tout le monde ne clique pas "Passer au vote".
@@ -856,6 +857,7 @@ export class GameEngine {
       player.isReady = false;
       player.role = null;
       player.theme = null;
+      player.mission = null;
       player.usedTrackKeys = new Set();
       player.score = 0;
     }
@@ -865,7 +867,6 @@ export class GameEngine {
     room.turnOrder = [];
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
-    room.currentMission = null;
     room.chatMessages = [];
     room.votes = new Map();
     room.undercoverAccusedId = null;
@@ -960,7 +961,6 @@ export class GameEngine {
       turnOrder: room.turnOrder,
       currentTurnPlayerId: this.currentTurnPlayerId,
       clues: room.currentRoundClues,
-      currentMission: room.currentMission,
       chatMessages: room.chatMessages,
       phaseDeadline: room.phaseDeadline,
       lastEliminatedPlayerIds: room.lastEliminatedPlayerIds,

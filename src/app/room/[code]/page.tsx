@@ -153,6 +153,12 @@ function MyThemeBadge({ secret }: { secret: PrivatePlayerSecret }) {
             Mode streamer
           </button>
           <p className={streamerMode ? "select-none text-sm text-paper blur-sm" : "text-sm text-paper"}>{label}</p>
+          {secret.mission && (
+            <div className={streamerMode ? "select-none blur-sm" : undefined}>
+              <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-alert">Mission secrète</p>
+              <p className="text-xs text-paper">{secret.mission.label}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -371,6 +377,14 @@ function PhaseRoleReveal({ mySecret, ackRoleReveal }: Props) {
 
         {streamerMode && <p className="mt-4 text-xs text-paper-faint">Contenu masqué — touche &laquo;&nbsp;Mode streamer&nbsp;&raquo; pour le révéler.</p>}
       </div>
+
+      {mySecret?.mission && (
+        <div className={`mt-4 rounded-2xl border border-alert/30 bg-alert-dim px-4 py-3.5 text-center ${streamerMode ? "select-none blur-md" : ""}`}>
+          <p className="text-xs font-medium uppercase tracking-wide text-alert">Ta mission secrète</p>
+          <p className="mt-1 text-sm text-paper">{mySecret.mission.label}</p>
+          <p className="mt-1.5 text-xs text-paper-faint">À toi seul(e) de la connaître — ne la dis à personne.</p>
+        </div>
+      )}
     </PhaseShell>
   );
 }
@@ -401,7 +415,7 @@ function PhaseRoundStart({ state }: Props) {
 // ---------------------------------------------------------------------------
 // ENVOI DE MUSIQUE — analyser = envoyer, automatiquement
 // ---------------------------------------------------------------------------
-function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution }: Props) {
+function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution, mySecret }: Props) {
   const isMyTurn = state.currentTurnPlayerId === playerId;
   const currentPlayer = state.players.find((p) => p.id === state.currentTurnPlayerId);
   const [url, setUrl] = useState("");
@@ -410,7 +424,6 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
   if (!isMyTurn) {
     return (
       <PhaseShell title={`Au tour de ${currentPlayer?.nickname ?? "…"}`}>
-        <MissionBanner mission={state.currentMission} />
         <div className="flex flex-col items-center gap-6 py-8">
           {state.phaseDeadline && <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.musicSeconds * 1000} size={72} />}
           <Avatar emoji={currentPlayer?.avatar ?? "🎵"} size="lg" pulsing ringColor="signal" />
@@ -423,7 +436,7 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
 
   return (
     <PhaseShell eyebrow="Ton tour" title="Trouve une musique" subtitle="Colle le lien : il est envoyé automatiquement dès qu'on le reconnaît.">
-      <MissionBanner mission={state.currentMission} />
+      <MissionBanner mission={mySecret?.mission ?? null} />
       {state.phaseDeadline && (
         <div className="mb-4 flex justify-center">
           <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.musicSeconds * 1000} />
@@ -480,7 +493,7 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
  * tours), donc affichée avec un peu d'emphase quand elle tombe. Rien à
  * afficher le reste du temps.
  */
-function MissionBanner({ mission }: { mission: Props["state"]["currentMission"] }) {
+function MissionBanner({ mission }: { mission: import("@/types").Mission | null }) {
   if (!mission) return null;
   return (
     <div className="mb-4 flex items-center gap-3 rounded-2xl border border-alert/30 bg-alert-dim px-4 py-3">
@@ -538,7 +551,6 @@ function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackContr
 
   return (
     <PhaseShell wide title={`Indice de ${owner?.nickname ?? "?"}`}>
-      <MissionBanner mission={state.currentMission} />
       <ClueMedia
         provider={clue.provider}
         videoId={clue.videoId}

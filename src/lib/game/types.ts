@@ -18,6 +18,8 @@ export interface ServerPlayer {
   socketId: string | null;
   role: Role | null;
   theme: string | null;
+  /** Contrainte privée pour toute la manche (ou null la plupart du temps) — connue du seul joueur concerné. Voir assignMissionsForRound(). */
+  mission: Mission | null;
   /** Clés de morceaux déjà utilisées par CE joueur (provider:trackId), pour éviter les doublons — remis à zéro à chaque manche. */
   usedTrackKeys: Set<string>;
   hasPlayedThisRound: boolean;
@@ -38,8 +40,6 @@ export interface ServerRoom {
   turnOrder: string[];
   currentTurnIndex: number;
   currentRoundClues: MusicClue[];
-  /** Contrainte publique du tour en cours (ou null la plupart du temps) — voir maybePickMission(). */
-  currentMission: Mission | null;
   chatMessages: ChatMessage[];
   /** voterId -> cible UNIQUE, réutilisé pour le tour de vote actif (infiltré, puis Mr White). */
   votes: Map<string, string>;
@@ -77,7 +77,6 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     turnOrder: [],
     currentTurnIndex: 0,
     currentRoundClues: [],
-    currentMission: null,
     chatMessages: [],
     votes: new Map(),
     undercoverAccusedId: null,

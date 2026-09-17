@@ -49,14 +49,37 @@ function loadMissionsFromCsv(): Mission[] {
 
 export const OFFICIAL_MISSIONS: Mission[] = loadMissionsFromCsv();
 
+function pickRandomMission(): Mission | null {
+  if (OFFICIAL_MISSIONS.length === 0) return null;
+  const index = Math.floor(Math.random() * OFFICIAL_MISSIONS.length);
+  return OFFICIAL_MISSIONS[index] ?? null;
+}
+
 /**
- * Tirée à chaque tour. La plupart du temps, renvoie `null` (pas de
+ * Tirée pour UN joueur. La plupart du temps, renvoie `null` (pas de
  * contrainte) — c'est le comportement demandé : la mission reste
  * l'exception, pas la norme.
  */
 export function maybePickMission(): Mission | null {
-  if (OFFICIAL_MISSIONS.length === 0) return null;
   if (Math.random() >= MISSION_CHANCE) return null;
-  const index = Math.floor(Math.random() * OFFICIAL_MISSIONS.length);
-  return OFFICIAL_MISSIONS[index] ?? null;
+  return pickRandomMission();
+}
+
+/**
+ * Assigne une mission (ou non) à chaque joueur pour LA MANCHE — privé,
+ * connu du seul joueur concerné, jamais affiché aux autres. Chaque joueur a
+ * sa propre chance indépendante d'en recevoir une, mais on garantit qu'il y
+ * en ait TOUJOURS au moins une par manche (demande explicite) : si le tirage
+ * indépendant n'en donne aucune, on en force une sur un joueur choisi au
+ * hasard plutôt que de laisser la manche sans aucune mission.
+ */
+export function assignMissionsForRound(playerCount: number): (Mission | null)[] {
+  const missions: (Mission | null)[] = [];
+  for (let i = 0; i < playerCount; i++) missions.push(maybePickMission());
+  const hasAny = missions.some((m) => m !== null);
+  if (playerCount > 0 && !hasAny) {
+    const luckyIndex = Math.floor(Math.random() * playerCount);
+    missions[luckyIndex] = pickRandomMission();
+  }
+  return missions;
 }

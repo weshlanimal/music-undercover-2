@@ -122,6 +122,11 @@ export interface PublicPlayer {
  * `{ theme: null }` : il n'y a rien d'autre à lui cacher, l'absence de
  * thème EST son information.
  *
+ * `mission` est une contrainte privée supplémentaire (parfois aucune) —
+ * révélée en même temps que le thème, connue du seul joueur concerné.
+ * Personne d'autre, y compris le reste de l'état public, ne sait qui a une
+ * mission ni laquelle.
+ *
  * `roundNumber` sert à l'auto-réparation côté client : si le secret reçu ne
  * correspond pas à la manche affichée dans l'état public (message perdu lors
  * d'une micro-coupure réseau, onglet mis en veille…), le client en redemande
@@ -130,6 +135,7 @@ export interface PublicPlayer {
 export interface PrivatePlayerSecret {
   playerId: string;
   theme: string | null;
+  mission: Mission | null;
   roundNumber: number;
 }
 
@@ -182,8 +188,6 @@ export interface PublicRoomState {
   turnOrder: string[]; // playerIds, ordre de passage de la manche courante
   currentTurnPlayerId: string | null;
   clues: MusicClue[];
-  /** Contrainte publique du tour en cours (musique sans parole, rap français…) — null la plupart du temps. */
-  currentMission: Mission | null;
   /** Chat textuel — actif seulement pendant clue_playback et discussion, remis à zéro à chaque manche. */
   chatMessages: ChatMessage[];
   phaseDeadline: number | null; // epoch ms, null si timers désactivés

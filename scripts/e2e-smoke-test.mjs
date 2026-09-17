@@ -712,8 +712,18 @@ async function scenarioChatRestrictedToPhases() {
   const presenter = players.find((p) => p.playerId === currentId);
   const viewer = players.find((p) => p.playerId !== currentId);
   assert(
-    alex.state.currentMission === null || typeof alex.state.currentMission.label === "string",
-    "Le champ mission du tour est bien exposé dans l'état public (null la plupart du temps, ou {id,label})"
+    !("currentMission" in alex.state),
+    "Aucune trace de mission dans l'état public — ce n'est plus un champ partagé, seulement privé"
+  );
+  players.forEach((p) => {
+    assert(
+      p.secret.mission === null || typeof p.secret.mission.label === "string",
+      `${p.nickname} reçoit bien son propre champ mission dans son secret privé (null ou {id,label})`
+    );
+  });
+  assert(
+    players.some((p) => p.secret.mission !== null),
+    "Au moins un joueur de la manche a bien une mission (garantie minimum 1 par manche)"
   );
 
   presenter.socket.emit("music:submit_url", { url: "mock://demo-01" });
