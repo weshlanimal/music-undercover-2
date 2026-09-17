@@ -16,8 +16,13 @@ export function PhaseShell({ eyebrow, title, subtitle, children, footer, wide }:
   const maxWidth = wide ? "max-w-xl" : "max-w-md";
   return (
     <div className={`mx-auto flex min-h-[calc(100dvh-4rem)] w-full ${maxWidth} flex-col px-5 pb-28 pt-16 animate-rise`}>
-      <div className="mb-6">
-        {eyebrow && <p className="mb-1.5 text-sm text-wave">{eyebrow}</p>}
+      <div className="mb-7">
+        {eyebrow && (
+          <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-wave">
+            <span className="h-1 w-1 rounded-full bg-wave" />
+            {eyebrow}
+          </p>
+        )}
         <h1 className="font-display text-3xl font-medium leading-tight text-paper">{title}</h1>
         {subtitle && <p className="mt-2 text-paper-muted">{subtitle}</p>}
       </div>

@@ -12,8 +12,10 @@ import { CountdownRing } from "@/components/CountdownRing";
 import { ClueMedia } from "@/components/ClueMedia";
 import { QuitButton } from "@/components/QuitButton";
 import { RestartMatchButton } from "@/components/RestartMatchButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ReactionOverlay } from "@/components/ReactionOverlay";
 import { ReactionPicker } from "@/components/ReactionPicker";
+import { ChatPanel } from "@/components/ChatPanel";
 import { useGameSocket } from "@/lib/socket/client";
 import { mockDemoLinks } from "@/lib/music/MockMusicProvider";
 import type { MusicClue, PrivatePlayerSecret, Role } from "@/types";
@@ -42,6 +44,7 @@ export default function RoomPage() {
     return (
       <>
         <QuitButton onQuit={handleQuit} />
+        <ThemeToggle floating />
         <ReactionOverlay reactions={reactions} onExpire={removeReaction} />
         <PhaseShell title="Connexion à la salle…" subtitle={errorMessage ?? "Un instant."}>
           {errorMessage && (
@@ -66,6 +69,7 @@ export default function RoomPage() {
   return (
     <>
       <QuitButton onQuit={handleQuit} />
+      <ThemeToggle floating />
       {showRestartButton && <RestartMatchButton onRestart={rematch} />}
       <ReactionOverlay reactions={reactions} onExpire={removeReaction} />
       {showThemeBadge && <MyThemeBadge secret={mySecret!} />}
@@ -132,7 +136,7 @@ function MyThemeBadge({ secret }: { secret: PrivatePlayerSecret }) {
   const label = secret.theme ?? "Mr White — aucun thème";
 
   return (
-    <div className="fixed right-4 top-4 z-50">
+    <div className="fixed right-4 top-16 z-50">
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-full border border-ink-border bg-ink-elevated/90 px-3 py-2 text-xs text-paper-muted shadow-lg backdrop-blur-md hover:text-paper"
@@ -406,6 +410,7 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
   if (!isMyTurn) {
     return (
       <PhaseShell title={`Au tour de ${currentPlayer?.nickname ?? "…"}`}>
+        <MissionBanner mission={state.currentMission} />
         <div className="flex flex-col items-center gap-6 py-8">
           {state.phaseDeadline && <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.musicSeconds * 1000} size={72} />}
           <Avatar emoji={currentPlayer?.avatar ?? "🎵"} size="lg" pulsing ringColor="signal" />
@@ -418,6 +423,7 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
 
   return (
     <PhaseShell eyebrow="Ton tour" title="Trouve une musique" subtitle="Colle le lien : il est envoyé automatiquement dès qu'on le reconnaît.">
+      <MissionBanner mission={state.currentMission} />
       {state.phaseDeadline && (
         <div className="mb-4 flex justify-center">
           <CountdownRing deadline={state.phaseDeadline} totalMs={state.settings.timers.musicSeconds * 1000} />
@@ -469,6 +475,24 @@ function PhaseWaitingForMusic({ state, playerId, submitMusicUrl, musicResolution
   );
 }
 
+/**
+ * Contrainte publique du tour (voir Mission dans les types) — rare (~20% des
+ * tours), donc affichée avec un peu d'emphase quand elle tombe. Rien à
+ * afficher le reste du temps.
+ */
+function MissionBanner({ mission }: { mission: Props["state"]["currentMission"] }) {
+  if (!mission) return null;
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-alert/30 bg-alert-dim px-4 py-3">
+      <span className="text-xl">🎯</span>
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-alert">Mission</p>
+        <p className="text-sm text-paper">{mission.label}</p>
+      </div>
+    </div>
+  );
+}
+
 function ResolveErrorMessage({ reason }: { reason: string }) {
   const messages: Record<string, string> = {
     unrecognized_link: "Ce lien n'est pas reconnu. Colle un lien YouTube, ou un lien de démo.",
@@ -505,7 +529,7 @@ function TurnProgress({ state }: { state: Props["state"] }) {
 // la personne qui vient d'envoyer l'indice contrôle lecture/pause/défilement
 // pour tout le monde ; les autres suivent en lecture seule.
 // ---------------------------------------------------------------------------
-function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackControl, skipCluePlayback, sendReaction }: Props) {
+function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackControl, skipCluePlayback, sendReaction, sendChatMessage }: Props) {
   const clue = state.clues[state.clues.length - 1];
   const owner = state.players.find((p) => p.id === clue?.playerId);
   const isController = !!clue && clue.playerId === playerId;
@@ -514,6 +538,7 @@ function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackContr
 
   return (
     <PhaseShell wide title={`Indice de ${owner?.nickname ?? "?"}`}>
+      <MissionBanner mission={state.currentMission} />
       <ClueMedia
         provider={clue.provider}
         videoId={clue.videoId}
@@ -545,6 +570,7 @@ function PhaseCluePlayback({ state, playerId, sendPlaybackControl, playbackContr
       <div className="mt-5">
         <ReactionPicker onSend={sendReaction} />
       </div>
+      <ChatPanel messages={state.chatMessages} players={state.players} myPlayerId={playerId} onSend={sendChatMessage} />
     </PhaseShell>
   );
 }
@@ -566,7 +592,7 @@ function PhaseNextPlayer({ state }: Props) {
 // au vote" pour lancer le vote (demande explicite), l'hôte garde un
 // raccourci pour forcer en cas de blocage.
 // ---------------------------------------------------------------------------
-function PhaseDiscussion({ state, playerId, markDiscussionReady, hostAdvanceDiscussion }: Props) {
+function PhaseDiscussion({ state, playerId, markDiscussionReady, hostAdvanceDiscussion, sendChatMessage }: Props) {
   const [readySent, setReadySent] = useState(false);
   const isHost = state.hostPlayerId === playerId;
   const alive = state.players.filter((p) => p.isAlive);
@@ -605,6 +631,7 @@ function PhaseDiscussion({ state, playerId, markDiscussionReady, hostAdvanceDisc
         Prêts à voter : {state.discussionReadyCount} / {alive.length}
       </p>
       <CluesReplayList state={state} />
+      <ChatPanel messages={state.chatMessages} players={state.players} myPlayerId={playerId} onSend={sendChatMessage} />
     </PhaseShell>
   );
 }

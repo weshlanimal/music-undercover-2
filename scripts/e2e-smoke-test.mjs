@@ -673,6 +673,148 @@ async function scenarioSilentRejoin() {
 // (pas seulement à la toute fin comme "Revanche") — remet tout à zéro pour
 // toute la salle, retour au lobby.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Auto-réparation du thème : un joueur qui redemande son secret (simulateur
+// d'un message initial perdu — micro-coupure réseau, onglet en veille…)
+// reçoit bien le thème de LA MANCHE EN COURS, jamais un ancien.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Chat textuel : n'est ouvert QUE pendant l'écoute et la discussion, jamais
+// ailleurs (lobby, vote…) ; diffusé à tout le monde via l'état public.
+// ---------------------------------------------------------------------------
+async function scenarioChatRestrictedToPhases() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
+  await wait(400);
+
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
+  });
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
+
+  // Hors partie (lobby) : le chat est refusé.
+  sarah.clearError();
+  sarah.socket.emit("chat:send", { text: "Coucou avant la partie" });
+  await waitFor(() => sarah.lastError, "Le chat est refusé en dehors de l'écoute/discussion (ici : lobby)");
+
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+
+  const currentId = alex.state.currentTurnPlayerId;
+  const presenter = players.find((p) => p.playerId === currentId);
+  const viewer = players.find((p) => p.playerId !== currentId);
+  assert(
+    alex.state.currentMission === null || typeof alex.state.currentMission.label === "string",
+    "Le champ mission du tour est bien exposé dans l'état public (null la plupart du temps, ou {id,label})"
+  );
+
+  presenter.socket.emit("music:submit_url", { url: "mock://demo-01" });
+  await Promise.all(players.map((p) => waitForPhase(p, "clue_playback", 5000)));
+
+  // Pendant l'écoute : n'importe quel joueur peut écrire, diffusé à tous.
+  viewer.socket.emit("chat:send", { text: "Ce son est tellement bizarre 😂" });
+  await waitFor(() => alex.state.chatMessages.length === 1, "Le message envoyé pendant l'écoute apparaît bien dans l'état de tous les joueurs");
+  assert(
+    alex.state.chatMessages[0].text === "Ce son est tellement bizarre 😂" && alex.state.chatMessages[0].playerId === viewer.playerId,
+    "Le message diffusé porte bien le bon texte et le bon auteur"
+  );
+
+  // Les tours restants de la manche (le premier a déjà été joué ci-dessus).
+  const remainingTurns = alex.state.turnOrder.length - 1;
+  for (let i = 0; i < remainingTurns; i++) {
+    await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 10_000)));
+    const nextId = alex.state.currentTurnPlayerId;
+    const nextPlayer = players.find((p) => p.playerId === nextId);
+    nextPlayer.socket.emit("music:submit_url", { url: "mock://demo-0" + ((i % 8) + 2) });
+    await Promise.all(players.map((p) => waitForPhase(p, "clue_playback", 5000)));
+  }
+  await Promise.all(players.map((p) => waitForPhase(p, "discussion", 10_000)));
+
+  // Pendant la discussion : toujours ouvert.
+  alex.socket.emit("chat:send", { text: "Je pense que c'est Lucas" });
+  await waitFor(() => alex.state.chatMessages.length === 2, "Le chat reste ouvert pendant la discussion");
+
+  players.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+
+  // Pendant le vote : refusé à nouveau.
+  alex.clearError();
+  alex.socket.emit("chat:send", { text: "Message pendant le vote" });
+  await waitFor(() => alex.lastError, "Le chat est refusé pendant le vote");
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
+async function scenarioSecretSelfHeal() {
+  const alex = makeClient("Alex");
+  const sarah = makeClient("Sarah");
+  const lucas = makeClient("Lucas");
+  const players = [alex, sarah, lucas];
+  await wait(400);
+
+  alex.socket.emit("room:create", {
+    nickname: "Alex",
+    settings: { timers: { enabled: false }, mrWhiteEnabled: false, targetScore: 100 }
+  });
+  await waitFor(() => alex.roomCode, "Alex a créé la salle");
+  sarah.socket.emit("room:join", { code: alex.roomCode, nickname: "Sarah" });
+  lucas.socket.emit("room:join", { code: alex.roomCode, nickname: "Lucas" });
+  await waitFor(() => sarah.playerId && lucas.playerId, "Sarah et Lucas ont rejoint");
+
+  alex.socket.emit("host:start_game", {});
+  await Promise.all(players.map((p) => waitForPhase(p, "role_reveal")));
+  await waitFor(() => players.every((p) => p.secret), "Chaque joueur a reçu son secret initial");
+  assert(
+    players.every((p) => p.secret.roundNumber === 1),
+    "Le secret initial porte bien le numéro de la manche 1"
+  );
+  const themeRound1 = sarah.secret.theme;
+
+  // Un joueur redemande son secret explicitement (ce que le client fait
+  // tout seul s'il détecte un décalage) : il doit récupérer EXACTEMENT le
+  // même thème que celui déjà reçu, pas un thème différent ou vide.
+  sarah.socket.emit("role:request_secret", {});
+  await wait(300);
+  assert(sarah.secret.theme === themeRound1, "Redemander son secret renvoie bien le même thème que celui de la manche en cours");
+  assert(sarah.secret.roundNumber === 1, "Le secret redemandé porte le bon numéro de manche");
+
+  players.forEach((p) => p.socket.emit("role:ack", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "waiting_for_music", 8000)));
+  await playOneRound(players, alex);
+  players.forEach((p) => p.socket.emit("discussion:ready", {}));
+  await Promise.all(players.map((p) => waitForPhase(p, "voting_undercover", 5000)));
+  const [pA, pB, pC] = players;
+  pA.socket.emit("vote:submit", { targetId: pB.playerId });
+  pB.socket.emit("vote:submit", { targetId: pC.playerId });
+  pC.socket.emit("vote:submit", { targetId: pA.playerId });
+  await waitForPhase(alex, "elimination", 8000);
+  alex.socket.emit("host:force_next_phase", {});
+  await waitForPhase(alex, "round_result", 8000);
+  alex.socket.emit("host:force_next_phase", {});
+
+  // Manche 2 : un secret encore en mémoire pour la manche 1 doit être perçu
+  // comme périmé (c'est exactement le bug rapporté — sinon un joueur reste
+  // bloqué sur le thème précédent). On simule ça en redemandant le secret
+  // et en vérifiant qu'il correspond bien à LA NOUVELLE manche.
+  await waitForPhase(alex, "role_reveal", 8000);
+  await waitFor(() => alex.state.roundNumber === 2, "La manche 2 a bien commencé");
+  await waitFor(() => players.every((p) => p.secret.roundNumber === 2), "Tout le monde a reçu un secret à jour pour la manche 2, sans action manuelle");
+
+  lucas.socket.emit("role:request_secret", {});
+  await wait(300);
+  assert(lucas.secret.roundNumber === 2, "Une redemande explicite en manche 2 renvoie bien le secret de la manche 2, jamais celui de la manche 1");
+
+  players.forEach((p) => p.socket.disconnect());
+}
+
 async function scenarioRestartMidGame() {
   const alex = makeClient("Alex");
   const sarah = makeClient("Sarah");
@@ -750,6 +892,8 @@ async function main() {
   await runScenario("Contrôle de lecture watch2gether + bouton Passer", scenarioPlaybackControlAndSkip, 20_000);
   await runScenario("Réactions emoji (emote spam pendant l'écoute)", scenarioReactions, 20_000);
   await runScenario("Reconnexion silencieuse (bug session inconnue)", scenarioSilentRejoin, 10_000);
+  await runScenario("Chat restreint à l'écoute et la discussion", scenarioChatRestrictedToPhases, 45_000);
+  await runScenario("Auto-réparation du thème (plus besoin de F5)", scenarioSecretSelfHeal, 45_000);
   await runScenario("Recommencer en cours de partie (pas seulement à la fin)", scenarioRestartMidGame, 15_000);
   await runScenario("Quitter la salle en lobby", scenarioLeaveRoom, 15_000);
 

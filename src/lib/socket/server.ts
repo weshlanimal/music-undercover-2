@@ -173,6 +173,17 @@ export function attachSocketServer(io: Server): void {
       })
     );
 
+    socket.on(
+      ClientEvents.REQUEST_SECRET,
+      withEngine((engine, playerId) => {
+        // Auto-réparation : le client a détecté que son thème ne
+        // correspond pas à la manche en cours (message initial perdu) et
+        // en redemande un frais, adressé uniquement à lui.
+        const secret = engine.requestSecret(playerId);
+        if (secret) socket.emit(ServerEvents.ROLE_SECRET, secret);
+      })
+    );
+
     socket.on(ClientEvents.SUBMIT_MUSIC_URL, async (payload: { url: string }) => {
       if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
       const engine = engineFor(io, data.roomCode);
@@ -198,6 +209,13 @@ export function attachSocketServer(io: Server): void {
       if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
       const engine = engineFor(io, data.roomCode);
       const result = engine?.sendReaction(data.playerId, String(payload?.emoji ?? ""));
+      if (result && !result.ok) fail(socket, result.error);
+    });
+
+    socket.on(ClientEvents.SEND_CHAT_MESSAGE, (payload: { text: string }) => {
+      if (!data.roomCode || !data.playerId) return fail(socket, "Tu n'es pas dans une salle.");
+      const engine = engineFor(io, data.roomCode);
+      const result = engine?.sendChatMessage(data.playerId, String(payload?.text ?? ""));
       if (result && !result.ok) fail(socket, result.error);
     });
 

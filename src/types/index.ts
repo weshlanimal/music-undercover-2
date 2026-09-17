@@ -35,6 +35,27 @@ export interface ThemePair {
   ownerRoomCode?: string;
 }
 
+/**
+ * Contrainte supplémentaire, publique (pas un secret), assignée au hasard à
+ * CERTAINS tours (la probabilité qu'il n'y en ait aucune reste largement la
+ * plus élevée). S'ajoute au thème du joueur sans le remplacer : sa musique
+ * doit toujours coller à son thème ET respecter la mission, si elle existe.
+ * Non vérifiée automatiquement (pas de métadonnée de genre fiable sur
+ * YouTube) — c'est une règle de bonne foi entre joueurs, comme au Jackbox.
+ */
+export interface Mission {
+  id: string;
+  label: string;
+}
+
+/** Message de la chatbox textuelle — visible pendant l'écoute et le débat, remis à zéro à chaque manche. */
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  text: string;
+  sentAt: number;
+}
+
 export interface RoomSettings {
   maxPlayers: number; // 3..16
   mrWhiteEnabled: boolean;
@@ -100,10 +121,16 @@ export interface PublicPlayer {
  * les deux `{ theme: string }` — indiscernables. Mr White reçoit
  * `{ theme: null }` : il n'y a rien d'autre à lui cacher, l'absence de
  * thème EST son information.
+ *
+ * `roundNumber` sert à l'auto-réparation côté client : si le secret reçu ne
+ * correspond pas à la manche affichée dans l'état public (message perdu lors
+ * d'une micro-coupure réseau, onglet mis en veille…), le client en redemande
+ * un frais tout seul plutôt que de rester bloqué sur l'ancien thème.
  */
 export interface PrivatePlayerSecret {
   playerId: string;
   theme: string | null;
+  roundNumber: number;
 }
 
 /** Un indice musical — entièrement visible par tous, y compris pendant la manche. */
@@ -155,6 +182,10 @@ export interface PublicRoomState {
   turnOrder: string[]; // playerIds, ordre de passage de la manche courante
   currentTurnPlayerId: string | null;
   clues: MusicClue[];
+  /** Contrainte publique du tour en cours (musique sans parole, rap français…) — null la plupart du temps. */
+  currentMission: Mission | null;
+  /** Chat textuel — actif seulement pendant clue_playback et discussion, remis à zéro à chaque manche. */
+  chatMessages: ChatMessage[];
   phaseDeadline: number | null; // epoch ms, null si timers désactivés
   /** Éliminé·e·s par les votes de cette manche (0 à 2 personnes : l'accusé infiltré et/ou l'accusé Mr White). */
   lastEliminatedPlayerIds: string[];

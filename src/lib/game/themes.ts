@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ThemePair } from "@/types";
+import { parseCsv } from "@/lib/csv";
 
 // ---------------------------------------------------------------------------
 // La base de thèmes officiels est lue directement depuis data/themes.csv au
 // démarrage du serveur — PAS d'étape de compilation séparée. C'est un choix
-// délibéré : la version précédente générait un fichier TypeScript à partir
+// délibéré : une version antérieure générait un fichier TypeScript à partir
 // du CSV via un script à lancer manuellement, et il était trop facile
 // d'éditer le CSV (notamment via l'éditeur web de GitHub) sans relancer ce
 // script, ce qui laissait le jeu tourner avec d'anciens thèmes sans aucun
@@ -19,66 +20,6 @@ import type { ThemePair } from "@/types";
 // ---------------------------------------------------------------------------
 
 const CSV_PATH = join(process.cwd(), "data", "themes.csv");
-
-/** Parseur CSV minimal mais conforme RFC4180 (champs entre guillemets, guillemets échappés en ""). */
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  let i = 0;
-
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM UTF-8 éventuel
-
-  while (i < text.length) {
-    const char = text[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i++;
-        continue;
-      }
-      field += char;
-      i++;
-      continue;
-    }
-    if (char === '"') {
-      inQuotes = true;
-      i++;
-      continue;
-    }
-    if (char === ",") {
-      row.push(field);
-      field = "";
-      i++;
-      continue;
-    }
-    if (char === "\r") {
-      i++;
-      continue;
-    }
-    if (char === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-      i++;
-      continue;
-    }
-    field += char;
-    i++;
-  }
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.length > 1 || r[0] !== "");
-}
 
 function loadThemesFromCsv(): ThemePair[] {
   let csvText: string;
@@ -96,8 +37,13 @@ function loadThemesFromCsv(): ThemePair[] {
   const civilIndex = trimmedHeader.indexOf("theme_a");
   const undercoverIndex = trimmedHeader.indexOf("theme_b");
   const categoryIndex = trimmedHeader.indexOf("category");
-  const indices: Record<string, number> = { id: idIndex, theme_a: civilIndex, theme_b: undercoverIndex, category: categoryIndex };
-  for (const [name, index] of Object.entries(indices)) {
+  const columnChecks: [string, number][] = [
+    ["id", idIndex],
+    ["theme_a", civilIndex],
+    ["theme_b", undercoverIndex],
+    ["category", categoryIndex]
+  ];
+  for (const [name, index] of columnChecks) {
     if (index === -1) throw new Error(`Colonne manquante dans data/themes.csv : "${name}".`);
   }
 

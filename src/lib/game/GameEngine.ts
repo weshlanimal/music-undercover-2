@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_ROOM_SETTINGS } from "@/types";
 import { createEmptyRoom, type ServerPlayer, type ServerRoom } from "./types";
 import { OFFICIAL_THEMES, pickRandomTheme } from "./themes";
+import { maybePickMission } from "./missions";
 import { GameRules } from "./GameRules";
 import { isValidReactionEmoji } from "@/lib/reactions";
 import { MusicResolver } from "@/lib/music/MusicResolver";
@@ -60,9 +61,9 @@ function trackKey(track: Pick<ResolvedTrack, "provider" | "providerTrackId">): s
  * message, donc rien dans le payload réseau ne permet de deviner lequel des
  * deux on est.
  */
-function buildPrivateSecret(player: ServerPlayer): PrivatePlayerSecret | null {
+function buildPrivateSecret(player: ServerPlayer, roundNumber: number): PrivatePlayerSecret | null {
   if (!player.role) return null;
-  return { playerId: player.id, theme: player.theme };
+  return { playerId: player.id, theme: player.theme, roundNumber };
 }
 
 export class GameEngine {
@@ -136,7 +137,20 @@ export class GameEngine {
     player.connected = true;
     player.socketId = socketId;
     this.bus.broadcastState(this.room);
-    return { ok: true, value: buildPrivateSecret(player) };
+    return { ok: true, value: buildPrivateSecret(player, this.room.roundNumber) };
+  }
+
+  /**
+   * Auto-réparation : le client redemande son secret lui-même s'il détecte
+   * que celui qu'il a ne correspond pas à la manche en cours (message
+   * initial perdu lors d'une micro-coupure réseau, onglet mis en veille…).
+   * Pas besoin de F5 : la prochaine mise à jour d'état déclenche cette
+   * requête et corrige tout en un aller-retour.
+   */
+  requestSecret(playerId: string): PrivatePlayerSecret | null {
+    const player = this.room.players.get(playerId);
+    if (!player) return null;
+    return buildPrivateSecret(player, this.room.roundNumber);
   }
 
   disconnectPlayer(playerId: string): void {
@@ -213,6 +227,7 @@ export class GameEngine {
     room.lastRoundTheme = null;
     room.mrWhiteGuessPlayerId = null;
     room.mrWhiteGuessResult = null;
+    room.currentMission = null;
     this.sendAllSecrets();
     this.bus.broadcastState(room);
     // Pas de délai automatique ici (demande explicite) : la manche n'avance
@@ -246,7 +261,7 @@ export class GameEngine {
 
   private sendAllSecrets(): void {
     for (const player of this.room.players.values()) {
-      const secret = buildPrivateSecret(player);
+      const secret = buildPrivateSecret(player, this.room.roundNumber);
       if (!secret) continue;
       this.bus.sendToPlayer(player.id, "role:secret", secret);
     }
@@ -277,6 +292,8 @@ export class GameEngine {
     room.turnOrder = shuffle(alivePlayers.map((p) => p.id));
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
+    room.currentMission = null;
+    room.chatMessages = []; // fil de discussion neuf à chaque manche
     room.phase = "round_start";
     this.bus.broadcastState(room);
     this.scheduleTimeout(2_500, () => this.beginTurn());
@@ -286,6 +303,9 @@ export class GameEngine {
     const room = this.room;
     room.phase = "waiting_for_music";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.musicSeconds * 1000 : null;
+    // Contrainte publique optionnelle, tirée pour CE tour uniquement — la
+    // plupart du temps aucune (voir maybePickMission).
+    room.currentMission = maybePickMission();
     this.bus.broadcastState(room);
     this.scheduleDeadline(room.phaseDeadline, () => this.forceSkipCurrentTurn());
   }
@@ -426,6 +446,31 @@ export class GameEngine {
     return { ok: true, value: undefined };
   }
 
+  /**
+   * Chat textuel — actif seulement pendant l'écoute (clue_playback) et le
+   * débat (discussion), pour permettre de jouer sans discussion vocale.
+   * Contrairement aux réactions emoji, les messages sont conservés dans
+   * l'état de la room (pas purement éphémères) pour qu'un joueur qui
+   * rejoint en retard voie l'historique de la manche — mais remis à zéro à
+   * chaque nouvelle manche (voir beginTurnOrder).
+   */
+  sendChatMessage(playerId: string, text: string): EngineResult {
+    const room = this.room;
+    if (room.phase !== "clue_playback" && room.phase !== "discussion") {
+      return { ok: false, error: "Le chat n'est ouvert que pendant l'écoute et la discussion." };
+    }
+    if (!room.players.get(playerId)) return { ok: false, error: "Joueur introuvable." };
+    const trimmed = text.trim().slice(0, 300);
+    if (!trimmed) return { ok: false, error: "Message vide." };
+
+    room.chatMessages.push({ id: createId("chat"), playerId, text: trimmed, sentAt: Date.now() });
+    // Garde-fou anti-débordement pour une manche qui traînerait en longueur.
+    if (room.chatMessages.length > 200) room.chatMessages = room.chatMessages.slice(-200);
+
+    this.bus.broadcastState(room);
+    return { ok: true, value: undefined };
+  }
+
   private advanceToNextTurnOrDiscussion(): void {
     const room = this.room;
     room.currentTurnIndex += 1;
@@ -445,6 +490,7 @@ export class GameEngine {
     for (const p of room.players.values()) p.isReady = false;
     room.phase = "discussion";
     room.phaseDeadline = room.settings.timers.enabled ? Date.now() + room.settings.timers.discussionSeconds * 1000 : null;
+    room.currentMission = null; // plus de tour de musique à ce stade, la mission n'a plus lieu d'être affichée
     this.bus.broadcastState(room);
     // Plafond dur à 5 minutes (ou la valeur configurée) : filet de sécurité
     // si tout le monde ne clique pas "Passer au vote".
@@ -819,6 +865,8 @@ export class GameEngine {
     room.turnOrder = [];
     room.currentTurnIndex = 0;
     room.currentRoundClues = [];
+    room.currentMission = null;
+    room.chatMessages = [];
     room.votes = new Map();
     room.undercoverAccusedId = null;
     room.undercoverTally = null;
@@ -912,6 +960,8 @@ export class GameEngine {
       turnOrder: room.turnOrder,
       currentTurnPlayerId: this.currentTurnPlayerId,
       clues: room.currentRoundClues,
+      currentMission: room.currentMission,
+      chatMessages: room.chatMessages,
       phaseDeadline: room.phaseDeadline,
       lastEliminatedPlayerIds: room.lastEliminatedPlayerIds,
       lastEliminatedRoles: room.lastEliminatedRoles,

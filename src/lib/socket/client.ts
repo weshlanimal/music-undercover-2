@@ -49,6 +49,7 @@ interface UseGameSocketReturn {
   sendPlaybackControl: (action: "play" | "pause", positionSeconds: number) => void;
   skipCluePlayback: () => void;
   sendReaction: (emoji: string) => void;
+  sendChatMessage: (text: string) => void;
   /** À appeler par l'UI une fois l'animation d'une réaction terminée, pour la retirer de la liste. */
   removeReaction: (id: string) => void;
   submitMrWhiteGuess: (guess: string) => void;
@@ -71,6 +72,11 @@ export function useGameSocket(): UseGameSocketReturn {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [state, setState] = useState<PublicRoomState | null>(null);
   const [mySecret, setMySecret] = useState<PrivatePlayerSecret | null>(null);
+  // Miroir synchrone de mySecret, lisible depuis le handler ROOM_STATE (qui
+  // vit dans une closure figée par le useEffect à montage unique ci-dessous)
+  // sans dépendre du cycle de rendu React — nécessaire pour la vérification
+  // d'auto-réparation à chaque état reçu.
+  const mySecretRef = useRef<PrivatePlayerSecret | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [musicResolution, setMusicResolution] = useState<MusicResolutionStatus>({ state: "idle" });
   const [playbackControl, setPlaybackControl] = useState<PlaybackControlEvent | null>(null);
@@ -100,9 +106,28 @@ export function useGameSocket(): UseGameSocketReturn {
       // l'efface dès qu'on quitte clue_playback pour éviter qu'un vieil
       // ordre de lecture soit réappliqué par erreur au prochain indice.
       if (payload.phase !== "clue_playback") setPlaybackControl(null);
+
+      if (payload.status === "lobby") {
+        // Un nouveau match repart à la manche 1 : sans ce nettoyage, un
+        // secret laissé par un match précédent (lui aussi en manche 1)
+        // pourrait sembler "à jour" par coïncidence de numéro et passer
+        // sous le radar de la vérification d'auto-réparation ci-dessous.
+        mySecretRef.current = null;
+        setMySecret(null);
+      } else if (payload.status === "in_progress" && (!mySecretRef.current || mySecretRef.current.roundNumber !== payload.roundNumber)) {
+        // Auto-réparation : si le thème qu'on a en mémoire ne correspond pas
+        // à la manche affichée dans cet état (message initial perdu lors
+        // d'une micro-coupure réseau, onglet mis en veille sur mobile…), on
+        // en redemande un frais tout seul — plus besoin de F5 pour corriger
+        // un joueur resté bloqué sur le thème de la manche précédente.
+        socket.emit(ClientEvents.REQUEST_SECRET);
+      }
     });
 
-    socket.on(ServerEvents.ROLE_SECRET, (payload: PrivatePlayerSecret) => setMySecret(payload));
+    socket.on(ServerEvents.ROLE_SECRET, (payload: PrivatePlayerSecret) => {
+      mySecretRef.current = payload;
+      setMySecret(payload);
+    });
 
     socket.on(ServerEvents.MUSIC_RESOLVING, () => setMusicResolution({ state: "resolving" }));
     socket.on(ServerEvents.MUSIC_RESOLVE_ERROR, (payload: MusicResolveErrorPayload) =>
@@ -149,6 +174,7 @@ export function useGameSocket(): UseGameSocketReturn {
     sendPlaybackControl: (action, positionSeconds) => emit(ClientEvents.SEND_PLAYBACK_CONTROL, { action, positionSeconds }),
     skipCluePlayback: () => emit(ClientEvents.SKIP_CLUE_PLAYBACK),
     sendReaction: (emoji) => emit(ClientEvents.SEND_REACTION, { emoji }),
+    sendChatMessage: (text) => emit(ClientEvents.SEND_CHAT_MESSAGE, { text }),
     removeReaction: (id) => setReactions((prev) => prev.filter((r) => r.id !== id)),
     submitMrWhiteGuess: (guess) => emit(ClientEvents.SUBMIT_MRWHITE_GUESS, { guess }),
     hostValidateMrWhiteGuess: (correct) => emit(ClientEvents.HOST_VALIDATE_MRWHITE_GUESS, { correct }),

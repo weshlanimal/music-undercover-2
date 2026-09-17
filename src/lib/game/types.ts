@@ -1,4 +1,4 @@
-import type { GamePhase, MusicClue, Role, RoomSettings, RoomStatus, ThemePair, VoteTally } from "@/types";
+import type { ChatMessage, GamePhase, MusicClue, Mission, Role, RoomSettings, RoomStatus, ThemePair, VoteTally } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Ces types vivent UNIQUEMENT côté serveur (importés seulement depuis
@@ -38,6 +38,9 @@ export interface ServerRoom {
   turnOrder: string[];
   currentTurnIndex: number;
   currentRoundClues: MusicClue[];
+  /** Contrainte publique du tour en cours (ou null la plupart du temps) — voir maybePickMission(). */
+  currentMission: Mission | null;
+  chatMessages: ChatMessage[];
   /** voterId -> cible UNIQUE, réutilisé pour le tour de vote actif (infiltré, puis Mr White). */
   votes: Map<string, string>;
   /** Résultat du 1er tour (qui est l'infiltré ?), gardé secret côté serveur jusqu'à la révélation combinée finale. */
@@ -74,6 +77,8 @@ export function createEmptyRoom(code: string, hostPlayerId: string, settings: Ro
     turnOrder: [],
     currentTurnIndex: 0,
     currentRoundClues: [],
+    currentMission: null,
+    chatMessages: [],
     votes: new Map(),
     undercoverAccusedId: null,
     undercoverTally: null,
